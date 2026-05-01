@@ -1,2 +1,20 @@
+# Dependencies
 node_modules/
+
+# Environment files
 .env
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# Frontend/Backend specific
+/frontend/node_modules/
+/backend/node_modules/

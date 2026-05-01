@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
   if (!process.env.API_URL) {
     return NextResponse.json([])
   }
-git 
+  try {
+    const res = await fetch(`${process.env.API_URL}/products`)
+    const data = await res.json()
     return NextResponse.json(data)
   } catch {
     return NextResponse.json([], { status: 502 })
