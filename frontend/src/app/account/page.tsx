@@ -55,7 +55,7 @@ export default function AccountPage() {
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = localStorage.getItem("userToken")
     if (!token) return
 
     fetch(`${BASE_URL}/api/orders`, {
@@ -91,7 +91,7 @@ export default function AccountPage() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("token")
+    localStorage.removeItem("userToken")
     localStorage.removeItem("user")
     window.location.href = "/"
   }

@@ -17,6 +17,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/cart', require('./routes/cartRoutes'));
+app.use('/api/admin', require('./routes/adminAuthRoutes'));
 app.use('/api/admin/orders', require('./routes/adminOrderRoutes'));
 app.use('/api/inquiries', require('./routes/inquiryRoutes'));
 
@@ -24,6 +25,7 @@ const { protect } = require('./middleware/authMiddleware');
 app.get('/api/test', protect, (req, res) => {
   res.json({ message: 'Protected route working', user: req.user });
 });
+
 
 app.get('/', (req, res) => {
   res.json({ message: 'API running' });

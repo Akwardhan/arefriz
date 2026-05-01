@@ -7,7 +7,7 @@ import {
   MapPin, Phone, User, Wrench, Package, Search, ChevronDown, LogOut, Send,
 } from "lucide-react"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { adminAuthHeaders } from "@/lib/auth"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -113,7 +113,7 @@ export default function OrdersPanel() {
   const [search,  setSearch]  = useState("")
 
   function handleLogout() {
-    localStorage.removeItem("token")
+    sessionStorage.removeItem("adminToken")
     localStorage.removeItem("user")
     router.push("/login")
   }
@@ -122,7 +122,7 @@ export default function OrdersPanel() {
     setLoading(true)
     try {
       const res   = await fetch(`${BASE_URL}/api/orders`, {
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
       })
       const data = await res.json()
       if (res.ok) {
@@ -136,7 +136,7 @@ export default function OrdersPanel() {
   const updateStatus = async (orderId: string, status: string) => {
     await fetch(`${BASE_URL}/api/orders/${orderId}/status`, {
       method:  "PATCH",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
       body:    JSON.stringify({ orderStatus: status }),
     })
   }
@@ -363,15 +363,13 @@ function OrderCard({
     if (!dealerEmail) return
     setSendingDealer(true)
     try {
-      const res = await fetch(`${BASE_URL}/api/orders/send-to-dealer`, {
+      const res = await fetch(`${BASE_URL}/api/admin/orders/${orderId}/send-to-dealer`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body:    JSON.stringify({ orderId, dealerEmail }),
+        headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
+        body:    JSON.stringify({ dealerEmail }),
       })
-      const text = await res.text()
-      const data = text ? (() => { try { return JSON.parse(text) } catch { return text } })() : {}
-      if (!res.ok) throw new Error(data?.message ?? `Server error ${res.status}`)
-      alert("Email sent successfully")
+      if (!res.ok) throw new Error()
+      alert("Order sent to dealer successfully")
     } catch (error) {
       console.error("Error sending email:", error)
       alert("Failed to send email")

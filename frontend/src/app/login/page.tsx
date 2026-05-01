@@ -53,12 +53,17 @@ export default function LoginPage() {
       console.log("Response:", data)
 
       if (res.ok) {
-        localStorage.setItem("token", data.token)
-        localStorage.setItem("user",  JSON.stringify(data.user))
-        const role = data.user?.role ?? decodeJwtRole(data.token)
-        window.location.href = role?.toLowerCase() === "admin" ? "/admin" : "/"
+        const role = (data.user?.role ?? decodeJwtRole(data.token))?.toLowerCase()
+        if (role !== "buyer") {
+          setError("Invalid credentials")
+          return
+        }
+        sessionStorage.removeItem("adminToken")
+        localStorage.setItem("userToken", data.token)
+        localStorage.setItem("user", JSON.stringify(data.user))
+        window.location.href = "/"
       } else {
-        setError(data.message ?? "Login failed")
+        setError(data.message)
       }
     } catch (err) {
       console.error(err)

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ShoppingCart, Check, AlertCircle, Loader2 } from "lucide-react"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { userAuthHeaders } from "@/lib/auth"
 
 interface Props {
   productId: string
@@ -26,7 +26,7 @@ export default function AddToCartButton({ productId, name, price, className, chi
     try {
       const res = await fetch(`${BASE_URL}/api/cart/add`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
         body: JSON.stringify({ productId, name, quantity: 1, price }),
       })
 

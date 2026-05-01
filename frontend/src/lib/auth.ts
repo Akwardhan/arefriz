@@ -1,9 +1,11 @@
-/**
- * Returns an Authorization header object if a token is stored,
- * otherwise returns an empty object. Safe to spread into fetch headers.
- */
-export function authHeaders(): Record<string, string> {
+export function userAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {}
-  const token = localStorage.getItem("token")
+  const token = localStorage.getItem("userToken")
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export function adminAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {}
+  const token = sessionStorage.getItem("adminToken")
   return token ? { Authorization: `Bearer ${token}` } : {}
 }

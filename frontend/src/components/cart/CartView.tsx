@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Minus, Plus, X, ShoppingCart } from "lucide-react"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { userAuthHeaders } from "@/lib/auth"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,62 +49,97 @@ const fmt = (n: number) =>
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CartView() {
+  const router = useRouter()
+
+  // undefined = not yet hydrated, null = no token, string = token present
+  const [token, setToken]     = useState<string | null | undefined>(undefined)
   const [cart, setCart]       = useState<CartData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function fetchCart() {
-    try {
-      const res = await fetch(`${BASE_URL}/api/cart`, {
-        headers: { ...authHeaders() },
-        cache: "no-store",
-      })
-      const data = res.ok ? await res.json().catch(() => ({})) : {}
-      const products: CartItem[] = await Promise.all(
-        (data.products || []).map(async (item: CartItem) => {
-          if (typeof item.productId !== "string") return item
-          try {
-            const r = await fetch(`${BASE_URL}/api/products/${item.productId}`, { headers: authHeaders() })
-            if (r.ok) return { ...item, productId: await r.json() }
-          } catch {}
-          return item
-        })
-      )
-      setCart({ products, totalAmount: data.totalAmount || 0 })
-    } catch {
-      // network error — leave cart null
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Step 1 — read token synchronously after mount. Nothing renders until this runs.
+  useEffect(() => {
+    setToken(localStorage.getItem("userToken"))
+  }, [])
 
-  useEffect(() => { fetchCart() }, [])
+  // Step 2 — only fetch cart when we have a token. Never called if token is absent.
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+
+    async function fetchCart() {
+      try {
+        const res = await fetch(`${BASE_URL}/api/cart`, {
+          headers: { ...userAuthHeaders() },
+          cache: "no-store",
+        })
+        const data = res.ok ? await res.json().catch(() => ({})) : {}
+        const products: CartItem[] = await Promise.all(
+          (data.products || []).map(async (item: CartItem) => {
+            if (typeof item.productId !== "string") return item
+            try {
+              const r = await fetch(`${BASE_URL}/api/products/${item.productId}`, { headers: userAuthHeaders() })
+              if (r.ok) return { ...item, productId: await r.json() }
+            } catch {}
+            return item
+          })
+        )
+        if (!cancelled) setCart({ products, totalAmount: data.totalAmount || 0 })
+      } catch {
+        // network error — leave cart null
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchCart()
+    return () => { cancelled = true }
+  }, [token])
 
   async function handleRemove(productId: string) {
     await fetch(`${BASE_URL}/api/cart/${productId}`, {
       method: "DELETE",
-      headers: authHeaders(),
+      headers: userAuthHeaders(),
     })
-    fetchCart()
+    // re-trigger fetch
+    setToken(t => t)
+    setLoading(true)
+    setCart(null)
   }
 
   async function handleQty(productId: string, name: string, currentQty: number, itemPrice: number, delta: number) {
     const newQty = currentQty + delta
-    if (newQty < 1) {
-      await handleRemove(productId)
-      return
-    }
-    await fetch(`${BASE_URL}/api/cart/${productId}`, {
-      method: "DELETE",
-      headers: authHeaders(),
-    })
+    if (newQty < 1) { await handleRemove(productId); return }
+    await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: userAuthHeaders() })
     await fetch(`${BASE_URL}/api/cart/add`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...userAuthHeaders() },
       body: JSON.stringify({ productId, name, quantity: newQty, price: itemPrice }),
     })
-    fetchCart()
+    setToken(t => t)
+    setLoading(true)
+    setCart(null)
   }
 
+  // ── Gate 1: waiting for hydration ──────────────────────────────────────────
+  if (token === undefined) return null
+
+  // ── Gate 2: not logged in — show login prompt, render NOTHING else ──────────
+  if (!token) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-32 text-center">
+        <ShoppingCart className="h-12 w-12 text-gray-200" strokeWidth={1} />
+        <p className="text-[0.9rem] font-medium text-gray-500">Login to access your cart</p>
+        <button
+          onClick={() => router.push("/login")}
+          className="mt-1 rounded-lg bg-black px-6 py-2.5 text-[0.82rem] font-semibold text-white transition-colors hover:bg-gray-800"
+        >
+          Login
+        </button>
+      </div>
+    )
+  }
+
+  // ── Gate 3: logged in but cart still loading ────────────────────────────────
   if (loading) return null
 
   const items = cart?.products ?? []

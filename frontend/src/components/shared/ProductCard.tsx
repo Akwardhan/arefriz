@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getImageUrl } from "@/lib/imageUrl"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { userAuthHeaders } from "@/lib/auth"
 
 interface ProductCardProps {
   id?: string
@@ -46,7 +46,7 @@ export default function ProductCard({
       console.log("[AddToCart] payload:", { productId, quantity: 1, price })
       const res = await fetch(`${BASE_URL}/api/cart/add`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
         body: JSON.stringify({ productId, name, quantity: 1, price }),
       })
       if (!res.ok) {

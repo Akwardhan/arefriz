@@ -15,8 +15,9 @@ const categories = [
 ]
 
 export default function Navbar() {
-  const [user, setUser] = useState<{ name?: string } | null>(null)
-  const [open, setOpen] = useState(false)
+  const [user, setUser]       = useState<{ name?: string } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [open, setOpen]       = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function Navbar() {
       const stored = localStorage.getItem("user")
       if (stored) setUser(JSON.parse(stored))
     } catch {}
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -35,8 +37,9 @@ export default function Navbar() {
   }, [])
 
   function handleLogout() {
-    localStorage.removeItem("token")
+    localStorage.removeItem("userToken")
     localStorage.removeItem("user")
+    localStorage.removeItem("arefriz_cart")
     window.location.href = "/"
   }
 
@@ -70,7 +73,7 @@ export default function Navbar() {
           <CartIcon />
 
           {/* Auth */}
-          {user ? (
+          {loading ? null : user ? (
             <div ref={ref} className="relative ml-1">
               <button
                 onClick={() => setOpen(v => !v)}

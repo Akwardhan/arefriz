@@ -29,7 +29,8 @@
       "PowerShell(Get-NetTCPConnection *)",
       "Bash(git push *)",
       "Bash(git remote *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(npx kill-port *)"
     ]
   }
 }

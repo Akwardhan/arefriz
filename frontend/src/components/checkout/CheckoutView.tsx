@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Package, CheckCircle2, AlertCircle } from "lucide-react"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { userAuthHeaders } from "@/lib/auth"
 import { getImageUrl } from "@/lib/imageUrl"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 
@@ -109,7 +109,7 @@ export default function CheckoutView() {
   async function fetchCart() {
     try {
       const res = await fetch(`${BASE_URL}/api/cart`, {
-        headers: { ...authHeaders() },
+        headers: { ...userAuthHeaders() },
         cache: "no-store",
       })
       const data = res.ok ? await res.json().catch(() => ({})) : {}
@@ -117,7 +117,7 @@ export default function CheckoutView() {
         (data.products || []).map(async (item: CartItem) => {
           if (typeof item.productId !== "string") return item
           try {
-            const r = await fetch(`${BASE_URL}/api/products/${item.productId}`, { headers: authHeaders() })
+            const r = await fetch(`${BASE_URL}/api/products/${item.productId}`, { headers: userAuthHeaders() })
             if (r.ok) return { ...item, productId: await r.json() }
           } catch {}
           return item
@@ -159,12 +159,12 @@ export default function CheckoutView() {
   async function handleQty(productId: string, name: string, currentQty: number, itemPrice: number, delta: number) {
     const newQty = currentQty + delta
     if (newQty < 1) {
-      await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: authHeaders() })
+      await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: userAuthHeaders() })
     } else {
-      await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: authHeaders() })
+      await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: userAuthHeaders() })
       await fetch(`${BASE_URL}/api/cart/add`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
         body:    JSON.stringify({ productId, name, quantity: newQty, price: itemPrice }),
       })
     }
@@ -241,7 +241,7 @@ export default function CheckoutView() {
     try {
       const res = await fetch(`${BASE_URL}/api/orders`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
         body:    JSON.stringify(snapshot),
       })
       if (!res.ok) {
@@ -267,7 +267,7 @@ export default function CheckoutView() {
         setCart({ products: [], totalAmount: 0 })
         setSelectedIds(new Set())
         window.dispatchEvent(new CustomEvent("cart-updated", { detail: { count: 0 } }))
-        fetch(`${BASE_URL}/api/cart/clear`, { method: "DELETE", headers: authHeaders() })
+        fetch(`${BASE_URL}/api/cart/clear`, { method: "DELETE", headers: userAuthHeaders() })
       }, 2500)
     } catch (err) {
       setStatus("error")

@@ -51,6 +51,7 @@ const orderSchema = new mongoose.Schema(
       },
     ],
     notes: { type: String, default: '' },
+    dealerEmail: { type: String, default: null },
     emailSent: { type: Boolean, default: false },
     emailSentAt: { type: Date, default: null },
   },

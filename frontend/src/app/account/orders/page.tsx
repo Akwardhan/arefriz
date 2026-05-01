@@ -198,7 +198,7 @@ export default function OrdersPage() {
     setMounted(true)
 
     const fetchOrders = () => {
-      const token = localStorage.getItem("token")
+      const token = localStorage.getItem("userToken")
       fetch(`${BASE_URL}/api/orders/my`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",

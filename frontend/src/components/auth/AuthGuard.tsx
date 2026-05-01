@@ -8,7 +8,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = localStorage.getItem("userToken")
     if (!token) {
       router.replace("/login")
     } else {

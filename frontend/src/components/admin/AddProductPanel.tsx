@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Plus, Trash2, Package, CheckCircle2, AlertCircle, Upload, X, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { authHeaders } from "@/lib/auth"
+import { adminAuthHeaders } from "@/lib/auth"
 import { BASE_URL } from "@/lib/config"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export default function AddProductPanel() {
     try {
       const res = await fetch(`${BASE_URL}/api/products`, {
         method:  "POST",
-        headers: authHeaders(),
+        headers: adminAuthHeaders(),
         body:    fd,
       })
       if (!res.ok) {

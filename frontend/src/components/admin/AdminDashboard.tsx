@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils"
 import AddProductPanel from "@/components/admin/AddProductPanel"
 import { BASE_URL } from "@/lib/config"
-import { authHeaders } from "@/lib/auth"
+import { adminAuthHeaders } from "@/lib/auth"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ function InquiriesPanel() {
 
   const fetchInquiries = () => {
     setLoading(true)
-    fetch(`${BASE_URL}/api/inquiries`, { headers: authHeaders() })
+    fetch(`${BASE_URL}/api/inquiries`, { headers: adminAuthHeaders() })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Inquiry[]) => { setInquiries(data); setLoading(false) })
       .catch(() => setLoading(false))
@@ -188,7 +188,7 @@ function InquiriesPanel() {
     )
     await fetch(`${BASE_URL}/api/inquiries/${id}`, {
       method:  "PATCH",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
       body:    JSON.stringify({ status }),
     }).catch(() => {/* silent */})
   }
@@ -368,7 +368,7 @@ function InquiryCard({
     try {
       const res = await fetch(`${BASE_URL}/api/inquiries/${inq._id}`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
         body:    JSON.stringify({ reply: replyText, email: inq.email }),
       })
       if (!res.ok) throw new Error()

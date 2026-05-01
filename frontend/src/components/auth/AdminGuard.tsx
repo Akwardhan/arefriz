@@ -3,30 +3,19 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-function getRole(): string | null {
-  // 1. Explicit "role" key saved by login page
-  const role = localStorage.getItem("role")
-  if (role) return role
-
-  // 2. Serialised user object {"role":"admin",...}
+function decodeAdminRole(): string | null {
   try {
-    const user = JSON.parse(localStorage.getItem("user") ?? "null")
-    if (user?.role) return String(user.role)
-  } catch { /* ignore */ }
-
-  // 3. Decode JWT payload — handles role / userType / type / isAdmin
-  try {
-    const token = localStorage.getItem("token")
-    if (token) {
-      const payload = JSON.parse(atob(token.split(".")[1]))
-      if (payload.role)     return String(payload.role)
-      if (payload.userType) return String(payload.userType)
-      if (payload.type)     return String(payload.type)
-      if (payload.isAdmin === true) return "admin"
-    }
-  } catch { /* ignore */ }
-
-  return null
+    const token = sessionStorage.getItem("adminToken")
+    if (!token) return null
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    if (payload.role)             return String(payload.role)
+    if (payload.userType)         return String(payload.userType)
+    if (payload.type)             return String(payload.type)
+    if (payload.isAdmin === true) return "admin"
+    return null
+  } catch {
+    return null
+  }
 }
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -34,20 +23,19 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const [state, setState] = useState<"checking" | "allowed" | "denied">("checking")
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = sessionStorage.getItem("adminToken")
 
     if (!token) {
       setState("denied")
-      router.replace("/login?redirect=/admin")
+      router.replace("/admin/login")
       return
     }
 
-    const role = getRole()
+    const role = decodeAdminRole()
     if (role?.toLowerCase() !== "admin") {
-      localStorage.removeItem("token")
-      localStorage.removeItem("role")
+      sessionStorage.removeItem("adminToken")
       setState("denied")
-      router.replace("/login?redirect=/admin")
+      router.replace("/admin/login")
       return
     }
 

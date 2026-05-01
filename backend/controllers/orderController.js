@@ -154,14 +154,64 @@ const sendToDealer = async (req, res) => {
         to: dealerEmail,
         subject: `New Order - ${order.orderId}`,
         html: `
-          <h2>New Order Received</h2>
-          <p><b>Name:</b> ${order.shippingDetails?.name}</p>
-          <p><b>Phone:</b> ${order.shippingDetails?.phone}</p>
-          <p><b>Address:</b> ${order.shippingDetails?.address}</p>
-          <p><b>Total:</b> ₹${order.totalAmount}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background: #f9f9f9;">
+            <div style="background: #ffffff; border-radius: 8px; padding: 32px; border: 1px solid #e0e0e0;">
+
+              <h2 style="margin: 0 0 4px 0; color: #1a1a1a;">New Order Assigned</h2>
+              <p style="margin: 0 0 24px 0; color: #888; font-size: 14px;">Order ID: <strong>${order.orderId}</strong></p>
+
+              <h3 style="margin: 0 0 12px 0; color: #333; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;">Buyer Details</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 8px 12px; background: #f4f4f4; font-weight: bold; width: 30%; border: 1px solid #e0e0e0;">Name</td>
+                  <td style="padding: 8px 12px; border: 1px solid #e0e0e0;">${order.shippingDetails?.name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 12px; background: #f4f4f4; font-weight: bold; border: 1px solid #e0e0e0;">Phone</td>
+                  <td style="padding: 8px 12px; border: 1px solid #e0e0e0;">${order.shippingDetails?.phone}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 12px; background: #f4f4f4; font-weight: bold; border: 1px solid #e0e0e0;">Address</td>
+                  <td style="padding: 8px 12px; border: 1px solid #e0e0e0;">${order.shippingDetails?.address}</td>
+                </tr>
+              </table>
+
+              <h3 style="margin: 0 0 12px 0; color: #333; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;">Order Items</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+                <thead>
+                  <tr style="background: #f4f4f4;">
+                    <th style="padding: 10px 12px; text-align: left; border: 1px solid #e0e0e0;">Product</th>
+                    <th style="padding: 10px 12px; text-align: center; border: 1px solid #e0e0e0;">Qty</th>
+                    <th style="padding: 10px 12px; text-align: right; border: 1px solid #e0e0e0;">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${order.products.map(p => `
+                  <tr>
+                    <td style="padding: 10px 12px; border: 1px solid #e0e0e0;">${p.name}</td>
+                    <td style="padding: 10px 12px; text-align: center; border: 1px solid #e0e0e0;">${p.quantity}</td>
+                    <td style="padding: 10px 12px; text-align: right; border: 1px solid #e0e0e0;">₹${p.price}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+
+              <div style="text-align: right; font-size: 16px; font-weight: bold; color: #1a1a1a; margin-bottom: 32px;">
+                Total: ₹${order.totalAmount}
+              </div>
+
+              <div style="border-top: 1px solid #eee; padding-top: 16px; color: #888; font-size: 13px; text-align: center;">
+                ARefriz Team
+              </div>
+
+            </div>
+          </div>
         `,
       });
       console.log('Email sent:', response);
+      console.log("Order sent to dealer:", dealerEmail);
+      console.log("Order ID:", order._id);
+      order.dealerEmail = dealerEmail;
+      await order.save();
     } catch (emailError) {
       console.error('Email failed — orderId:', orderId, '| dealerEmail:', dealerEmail, '| error:', emailError);
     }
