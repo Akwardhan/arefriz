@@ -2,21 +2,21 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import AdminGuard from "@/components/auth/AdminGuard"
+import DealerProtectedRoute from "@/components/auth/DealerProtectedRoute"
 
 const NAV_LINKS = [
   {
-    href: "/admin/products",
-    label: "Products",
+    href: "/dealer/dashboard",
+    label: "Dashboard",
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round"
-          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     ),
   },
   {
-    href: "/admin/orders",
+    href: "/dealer/orders",
     label: "Orders",
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -26,7 +26,17 @@ const NAV_LINKS = [
     ),
   },
   {
-    href: "/admin/inquiries",
+    href: "/dealer/products",
+    label: "Products",
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dealer/inquiries",
     label: "Inquiries",
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -35,39 +45,35 @@ const NAV_LINKS = [
       </svg>
     ),
   },
-  {
-    href: "/admin/dealers",
-    label: "Dealers",
-    icon: (
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-        <path strokeLinecap="round" strokeLinejoin="round"
-          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
 ]
 
-function AdminSidebar() {
+const PAGE_TITLES: Record<string, string> = {
+  "/dealer/dashboard": "Dashboard",
+  "/dealer/orders":    "Orders",
+  "/dealer/products":  "Products",
+  "/dealer/inquiries": "Inquiries",
+}
+
+function DealerSidebar() {
   const pathname = usePathname()
   const router   = useRouter()
 
   function handleLogout() {
-    sessionStorage.removeItem("adminToken")
-    router.replace("/admin/login")
+    sessionStorage.removeItem("dealerToken")
+    sessionStorage.removeItem("dealer")
+    router.replace("/dealer/login")
   }
 
   return (
     <aside style={{
-      width: "240px",
-      minHeight: "100vh",
-      background: "linear-gradient(180deg, #0f0c29 0%, #302b63 100%)",
-      display: "flex",
-      flexDirection: "column",
-      flexShrink: 0,
+      width: "240px", minHeight: "100vh", flexShrink: 0,
+      background: "linear-gradient(180deg, #022c22 0%, #064e3b 100%)",
       borderRight: "1px solid rgba(255,255,255,0.07)",
+      display: "flex", flexDirection: "column",
+      position: "sticky", top: 0, height: "100vh",
     }}>
 
-      {/* Brand + Sign out */}
+      {/* Brand */}
       <div style={{
         padding: "20px 16px",
         borderBottom: "1px solid rgba(255,255,255,0.07)",
@@ -76,29 +82,23 @@ function AdminSidebar() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{
             width: "32px", height: "32px", borderRadius: "9px", flexShrink: 0,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            background: "linear-gradient(135deg, #10b981, #059669)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(99,102,241,0.4)",
+            boxShadow: "0 4px 12px rgba(16,185,129,0.4)",
           }}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
           <div>
-            <p style={{ color: "white", fontWeight: 700, fontSize: "14px", lineHeight: 1, margin: 0 }}>
-              ARefriz
-            </p>
-            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "11px", marginTop: "3px" }}>
-              Admin Console
-            </p>
+            <p style={{ color: "white", fontWeight: 700, fontSize: "14px", lineHeight: 1, margin: 0 }}>ARefriz</p>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "11px", marginTop: "3px" }}>Dealer Portal</p>
           </div>
         </div>
 
-        {/* Sign out — always visible at the top */}
         <button
-          onClick={handleLogout}
-          title="Sign out"
+          onClick={handleLogout} title="Sign out"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
@@ -123,7 +123,7 @@ function AdminSidebar() {
         </button>
       </div>
 
-      {/* Nav links */}
+      {/* Nav */}
       <nav style={{ flex: 1, padding: "16px 12px", display: "flex", flexDirection: "column", gap: "2px" }}>
         <p style={{
           color: "rgba(255,255,255,0.25)", fontSize: "10px", fontWeight: 700,
@@ -134,28 +134,21 @@ function AdminSidebar() {
         </p>
 
         {NAV_LINKS.map(({ href, label, icon }) => {
-          const active = pathname.startsWith(href)
-
+          const active = pathname === href || pathname.startsWith(href + "/")
           return (
             <Link
-              key={href}
-              href={href}
+              key={href} href={href}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                fontSize: "14px",
-                fontWeight: active ? 600 : 400,
+                display: "flex", alignItems: "center", gap: "12px",
+                padding: "10px 12px", borderRadius: "10px",
+                fontSize: "14px", fontWeight: active ? 600 : 400,
                 color: active ? "white" : "rgba(255,255,255,0.45)",
                 background: active
-                  ? "linear-gradient(135deg, rgba(99,102,241,0.35), rgba(139,92,246,0.25))"
+                  ? "linear-gradient(135deg, rgba(16,185,129,0.3), rgba(5,150,105,0.2))"
                   : "transparent",
-                border: active ? "1px solid rgba(99,102,241,0.3)" : "1px solid transparent",
-                textDecoration: "none",
-                transition: "all 0.15s",
-                boxShadow: active ? "0 2px 8px rgba(99,102,241,0.15)" : "none",
+                border: active ? "1px solid rgba(16,185,129,0.3)" : "1px solid transparent",
+                textDecoration: "none", transition: "all 0.15s",
+                boxShadow: active ? "0 2px 8px rgba(16,185,129,0.15)" : "none",
               }}
               onMouseEnter={e => {
                 if (!active) {
@@ -170,7 +163,7 @@ function AdminSidebar() {
                 }
               }}
             >
-              <span style={{ color: active ? "#818cf8" : "rgba(255,255,255,0.3)", flexShrink: 0 }}>
+              <span style={{ color: active ? "#34d399" : "rgba(255,255,255,0.3)", flexShrink: 0 }}>
                 {icon}
               </span>
               {label}
@@ -183,21 +176,66 @@ function AdminSidebar() {
   )
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function DealerHeader() {
+  const pathname = usePathname()
+  const title = PAGE_TITLES[pathname] ?? "Dealer Portal"
+
+  const dealer = (() => {
+    try { return JSON.parse(sessionStorage.getItem("dealer") ?? "{}") } catch { return {} }
+  })()
+  const name: string = dealer?.name ?? ""
+  const initial = name ? name[0].toUpperCase() : "D"
+
+  return (
+    <header style={{
+      height: "60px", flexShrink: 0,
+      background: "white",
+      borderBottom: "1px solid #E5E7EB",
+      display: "flex", alignItems: "center",
+      padding: "0 28px",
+      justifyContent: "space-between",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+    }}>
+      <h1 style={{ fontSize: "18px", fontWeight: 700, color: "#111827", margin: 0, letterSpacing: "-0.02em" }}>
+        {title}
+      </h1>
+
+      {name && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "13px", color: "#6B7280" }}>{name}</span>
+          <div style={{
+            width: "32px", height: "32px", borderRadius: "50%",
+            background: "linear-gradient(135deg, #10b981, #059669)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white", fontSize: "13px", fontWeight: 700,
+            flexShrink: 0,
+          }}>
+            {initial}
+          </div>
+        </div>
+      )}
+    </header>
+  )
+}
+
+export default function DealerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  if (pathname === "/admin/login") {
+  if (pathname === "/dealer/login") {
     return <>{children}</>
   }
 
   return (
-    <AdminGuard>
-      <div style={{ display: "flex", minHeight: "100vh", background: "#F8FAFC" }}>
-        <AdminSidebar />
-        <main style={{ flex: 1, overflow: "auto" }}>
-          {children}
-        </main>
+    <DealerProtectedRoute>
+      <div style={{ display: "flex", height: "100vh", background: "#F0FDF4", overflow: "hidden" }}>
+        <DealerSidebar />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <DealerHeader />
+          <main style={{ flex: 1, overflow: "auto" }}>
+            {children}
+          </main>
+        </div>
       </div>
-    </AdminGuard>
+    </DealerProtectedRoute>
   )
 }

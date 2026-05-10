@@ -32,8 +32,11 @@ const createOrder = async (req, res) => {
 
     const { name, phone, address } = shippingDetails;
 
-    // --- Build product snapshot from DB ---
+    // --- Build product snapshot from DB + extract dealer info ---
     const populatedProducts = [];
+    let dealerId = null;
+    let dealerName = null;
+
     for (const item of products) {
       const product = await Product.findById(item.productId);
       if (!product) {
@@ -46,6 +49,10 @@ const createOrder = async (req, res) => {
         quantity: item.quantity,
         image: product.image || '',
       });
+      if (product.dealerId && !dealerId) {
+        dealerId = product.dealerId;
+        dealerName = product.dealerName || null;
+      }
     }
 
     // --- Compute total in backend ---
@@ -56,11 +63,16 @@ const createOrder = async (req, res) => {
       (techSurcharge || 0) +
       taxes;
 
+    // --- Commission split ---
+    const commissionPercent = 20;
+    const adminAmount = parseFloat(((calculatedTotal * commissionPercent) / 100).toFixed(2));
+    const dealerAmount = parseFloat((calculatedTotal - adminAmount).toFixed(2));
+
     console.log("Calculated total:", calculatedTotal);
 
     // --- Save order ---
     const order = new Order({
-      userId: req.user.userId,
+      userId: req.user.id,
       products: populatedProducts,
       shippingDetails: { name, phone, address },
       subtotal,
@@ -70,17 +82,18 @@ const createOrder = async (req, res) => {
       taxes,
       totalAmount: calculatedTotal,
       paymentStatus: 'pending',
-      orderStatus: 'placed',
+      orderStatus: 'processing',
+      dealerId: dealerId || null,
+      dealerName: dealerName || null,
+      commissionPercent,
+      adminAmount,
+      dealerAmount,
+      dealerPaid: false,
     });
 
     await order.save();
 
-    await Cart.updateMany({}, {
-      $set: {
-        products: [],
-        totalAmount: 0,
-      },
-    });
+    await Cart.findOneAndUpdate({ userId: req.user.id }, { $set: { items: [] } });
     console.log("Cart cleared after order");
 
     res.status(201).json({ orderId: order._id });

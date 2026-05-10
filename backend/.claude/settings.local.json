@@ -30,7 +30,15 @@
       "Bash(git push *)",
       "Bash(git remote *)",
       "Bash(git pull *)",
-      "Bash(npx kill-port *)"
+      "Bash(npx kill-port *)",
+      "Bash(xargs grep *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\ANMOLK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--arefriz-backend\\\\6bc03dcb-9ca2-4754-bba8-fe7cf37d6b0e\\\\tasks\\\\bgfkqu2ph.output\" -Wait)",
+      "Bash(Select-String -Pattern \"listening|running|started|error|Error|EADDRINUSE|Cannot\")",
+      "Bash(Get-Process node *)",
+      "Bash(Stop-Process -Force)",
+      "Bash(Get-Content \"C:\\\\Users\\\\ANMOLK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--arefriz-backend\\\\6bc03dcb-9ca2-4754-bba8-fe7cf37d6b0e\\\\tasks\\\\bkr4j6iyq.output\" -Wait)",
+      "Bash(Select-String -Pattern \"listening|running|started|error|Error|EADDRINUSE|Cannot|MongoDB\")",
+      "PowerShell(Get-Process *)"
     ]
   }
 }

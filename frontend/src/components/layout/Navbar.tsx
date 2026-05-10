@@ -39,7 +39,7 @@ export default function Navbar() {
   function handleLogout() {
     localStorage.removeItem("userToken")
     localStorage.removeItem("user")
-    localStorage.removeItem("arefriz_cart")
+    window.dispatchEvent(new Event("user-logout"))
     window.location.href = "/"
   }
 

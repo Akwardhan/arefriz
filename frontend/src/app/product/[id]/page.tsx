@@ -158,6 +158,13 @@ export default async function ProductPage({
                 {product.name}
               </h1>
 
+              {/* Dealer label */}
+              {product.dealerName && (
+                <p className="mt-2 text-[0.78rem] text-gray-400">
+                  Sold by <span className="font-semibold text-gray-700">{product.dealerName}</span>
+                </p>
+              )}
+
               {/* SKU */}
               <p className="mt-2.5 text-[0.75rem] text-gray-400">
                 SKU: <span className="font-mono text-gray-500">{product._id.toUpperCase()}</span>
@@ -187,9 +194,7 @@ export default async function ProductPage({
               {/* Actions */}
               <div className="flex flex-col gap-2.5">
                 <AddToCartButton
-                  productId={product._id}
-                  name={product.name}
-                  price={product.price}
+                  product={{ _id: product._id, name: product.name, price: product.price, image: product.image }}
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8]"
                 >
                   <ShoppingCart className="h-4 w-4" />

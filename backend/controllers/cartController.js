@@ -1,68 +1,86 @@
 const Cart = require('../models/Cart');
 
-const getCart = async () => {
-  let cart = await Cart.findOne();
-  if (!cart) {
-    cart = await Cart.create({ products: [], totalAmount: 0 });
-  }
-  return cart;
-};
+const getCartHandler = async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  console.log("USER FROM TOKEN:", req.user);
 
-const recalcTotal = (products) =>
-  products.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cart = await Cart.findOne({ userId });
+  if (!cart) return res.json({ items: [] });
+  return res.json({ items: cart.items });
+};
 
 const addToCart = async (req, res) => {
-  const { productId, quantity, price } = req.body;
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  console.log("USER FROM TOKEN:", req.user);
 
-  const cart = await getCart();
+  const { productId, name, price, image, quantity } = req.body;
 
-  const existing = cart.products.find(
-    (p) => p.productId.toString() === productId
-  );
-
-  if (existing) {
-    existing.quantity += quantity || 1;
-  } else {
-    cart.products.push({ productId, quantity: quantity || 1, price });
+  let cart = await Cart.findOne({ userId });
+  if (!cart) {
+    cart = new Cart({ userId, items: [] });
   }
 
-  cart.totalAmount = recalcTotal(cart.products);
-  await cart.save();
+  const existingItem = cart.items.find((item) => item.productId === productId);
+  if (existingItem) {
+    existingItem.quantity += quantity;
+  } else {
+    cart.items.push({ productId, name, price, image, quantity });
+  }
 
-  const populated = await Cart.findById(cart._id).populate('products.productId', 'name price image');
-  res.json(populated);
+  await cart.save();
+  res.json({ items: cart.items });
 };
 
-const getCartHandler = async (req, res) => {
-  const cart = await Cart.findOne().populate('products.productId', 'name price image');
-  if (!cart) return res.json({ products: [], totalAmount: 0 });
-  res.json(cart);
+const updateCartItem = async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  console.log("USER FROM TOKEN:", req.user);
+
+  const { productId, quantity } = req.body;
+
+  const cart = await Cart.findOne({ userId });
+  if (!cart) return res.status(404).json({ message: 'Cart not found' });
+
+  if (quantity === 0) {
+    cart.items = cart.items.filter((item) => item.productId !== productId);
+  } else {
+    const existing = cart.items.find((item) => item.productId === productId);
+    if (existing) existing.quantity = quantity;
+  }
+
+  await cart.save();
+  res.json({ items: cart.items });
 };
 
 const removeFromCart = async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  console.log("USER FROM TOKEN:", req.user);
+
   const { productId } = req.params;
 
-  const cart = await getCart();
+  const cart = await Cart.findOne({ userId });
+  if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
-  cart.products = cart.products.filter(
-    (p) => p.productId.toString() !== productId
-  );
-  cart.totalAmount = recalcTotal(cart.products);
+  cart.items = cart.items.filter((item) => item.productId !== productId);
   await cart.save();
-
-  res.json(cart);
+  res.json({ items: cart.items });
 };
 
 const clearCart = async (req, res) => {
-  const cart = await Cart.findOne();
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  console.log("USER FROM TOKEN:", req.user);
 
+  const cart = await Cart.findOne({ userId });
   if (cart) {
-    cart.products = [];
-    cart.totalAmount = 0;
+    cart.items = [];
     await cart.save();
   }
 
-  res.json({ message: "Cart cleared" });
+  res.json({ items: [] });
 };
 
-module.exports = { addToCart, getCart: getCartHandler, removeFromCart, clearCart };
+module.exports = { addToCart, getCart: getCartHandler, updateCartItem, removeFromCart, clearCart };

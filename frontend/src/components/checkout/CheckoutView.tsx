@@ -7,40 +7,12 @@ import { BASE_URL } from "@/lib/config"
 import { userAuthHeaders } from "@/lib/auth"
 import { getImageUrl } from "@/lib/imageUrl"
 import { useRequireAuth } from "@/lib/useRequireAuth"
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface PopulatedProduct {
-  _id:   string
-  name:  string
-  image: string
-  price: number
-  sku?:  string
-  stock?: boolean
-}
-
 interface CartItem {
-  productId: PopulatedProduct | string
-  name?:     string   // backend may store name directly on the item
-  quantity:  number
+  productId: string
+  name:      string
   price:     number
-}
-
-function pid(item: CartItem): string {
-  return typeof item.productId === "object" ? item.productId._id : item.productId
-}
-
-function pfield<K extends keyof PopulatedProduct>(item: CartItem, key: K): PopulatedProduct[K] | undefined {
-  return typeof item.productId === "object" ? item.productId[key] : undefined
-}
-
-function pname(item: CartItem): string {
-  return pfield(item, "name") ?? item.name ?? "—"
-}
-
-interface CartData {
-  products:    CartItem[]
-  totalAmount: number
+  quantity:  number
+  image?:    string
 }
 
 // ── Static config ─────────────────────────────────────────────────────────────
@@ -85,7 +57,7 @@ export default function CheckoutView() {
   const router = useRouter()
 
   // Cart
-  const [cart,    setCart]    = useState<CartData | null>(null)
+  const [cart,    setCart]    = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
 
   // Selection
@@ -104,39 +76,34 @@ export default function CheckoutView() {
   const [errMsg, setErrMsg] = useState("")
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
 
-  // ── Fetch cart ──────────────────────────────────────────────────────────────
+  // ── Fetch cart from backend ──────────────────────────────────────────────────
 
-  async function fetchCart() {
-    try {
-      const res = await fetch(`${BASE_URL}/api/cart`, {
-        headers: { ...userAuthHeaders() },
-        cache: "no-store",
-      })
-      const data = res.ok ? await res.json().catch(() => ({})) : {}
-      const products: CartItem[] = await Promise.all(
-        (data.products || []).map(async (item: CartItem) => {
-          if (typeof item.productId !== "string") return item
-          try {
-            const r = await fetch(`${BASE_URL}/api/products/${item.productId}`, { headers: userAuthHeaders() })
-            if (r.ok) return { ...item, productId: await r.json() }
-          } catch {}
-          return item
-        })
+  useEffect(() => {
+    async function fetchCart() {
+      const token = localStorage.getItem("userToken")
+      console.log("TOKEN:", token)
+      if (!token) return
+      const res  = await fetch(`${BASE_URL}/api/cart`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok || res.status === 204) { setLoading(false); return }
+      const data = await res.json()
+      const raw = data?.items || data?.products || []
+      const items: CartItem[] = raw.map((i: CartItem & { productId: string | { _id: string; name: string; price: number; image?: string } }) =>
+        typeof i.productId === "object"
+          ? { productId: i.productId._id, name: i.productId.name, price: i.productId.price, image: i.productId.image, quantity: i.quantity }
+          : i
       )
-      setCart({ products, totalAmount: data.totalAmount || 0 })
-      // Select all items by default
-      setSelectedIds(new Set(products.map((p) => pid(p))))
-    } catch { /* ignore */ }
-    finally { setLoading(false) }
-  }
-
-  useEffect(() => { fetchCart() }, [])
+      setCart(items)
+      setSelectedIds(new Set(items.map((i: CartItem) => i.productId)))
+      setLoading(false)
+    }
+    fetchCart()
+  }, [])
 
   // ── Selection helpers ───────────────────────────────────────────────────────
 
-  const items = cart?.products ?? []
-  const allSelected  = items.length > 0 && items.every((i) => selectedIds.has(pid(i)))
-  const someSelected = items.some((i) => selectedIds.has(pid(i)))
+  const items        = cart
+  const allSelected  = items.length > 0 && items.every((i) => selectedIds.has(i.productId))
+  const someSelected = items.some((i) => selectedIds.has(i.productId))
 
   function toggleItem(productId: string) {
     setSelectedIds((prev) => {
@@ -150,30 +117,31 @@ export default function CheckoutView() {
     setSelectedIds(
       allSelected
         ? new Set()
-        : new Set(items.map((i) => pid(i)))
+        : new Set(items.map((i) => i.productId))
     )
   }
 
   // ── Quantity update ─────────────────────────────────────────────────────────
 
-  async function handleQty(productId: string, name: string, currentQty: number, itemPrice: number, delta: number) {
+  async function handleQty(productId: string, _name: string, currentQty: number, _itemPrice: number, delta: number) {
     const newQty = currentQty + delta
     if (newQty < 1) {
       await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: userAuthHeaders() })
+      setCart((prev) => prev.filter((i) => i.productId !== productId))
+      setSelectedIds((prev) => { const s = new Set(prev); s.delete(productId); return s })
     } else {
-      await fetch(`${BASE_URL}/api/cart/${productId}`, { method: "DELETE", headers: userAuthHeaders() })
-      await fetch(`${BASE_URL}/api/cart/add`, {
-        method:  "POST",
+      await fetch(`${BASE_URL}/api/cart/update`, {
+        method:  "PATCH",
         headers: { "Content-Type": "application/json", ...userAuthHeaders() },
-        body:    JSON.stringify({ productId, name, quantity: newQty, price: itemPrice }),
+        body:    JSON.stringify({ productId, quantity: newQty }),
       })
+      setCart((prev) => prev.map((i) => i.productId === productId ? { ...i, quantity: newQty } : i))
     }
-    fetchCart()
   }
 
   // ── Pricing (based on selected items only) ──────────────────────────────────
 
-  const selectedItems      = items.filter((i) => selectedIds.has(pid(i)))
+  const selectedItems      = items.filter((i) => selectedIds.has(i.productId))
   const subtotal           = selectedItems.reduce((s, i) => s + i.price * i.quantity, 0)
   const logisticsCost      = SHIPPING[shipping].price
   const taxes              = Math.round(subtotal * GST_RATE)
@@ -207,7 +175,7 @@ export default function CheckoutView() {
 
   async function handlePlaceOrder(e: React.FormEvent) {
     e.preventDefault()
-    if (!cart || selectedItems.length === 0) return
+    if (selectedItems.length === 0) return
 
     if (!name.trim() || !phone.trim() || !address.trim()) {
       setStatus("error")
@@ -218,11 +186,11 @@ export default function CheckoutView() {
     // Snapshot everything before any async state mutation
     const snapshot = {
       products: selectedItems.map((i) => ({
-        productId: pid(i),
-        name:      pname(i),
+        productId: i.productId,
+        name:      i.name,
         price:     i.price,
         quantity:  i.quantity,
-        image:     pfield(i, "image") ?? "",
+        image:     i.image ?? "",
       })),
       shippingDetails: { name, phone, address },
       subtotal,
@@ -260,14 +228,11 @@ export default function CheckoutView() {
       })
 
       setTimeout(() => {
-        // Navigate first
-        router.push(`/order-success?${params}`)
-
-        // Clear cart ONLY after navigation is triggered
-        setCart({ products: [], totalAmount: 0 })
+        setCart([])
         setSelectedIds(new Set())
         window.dispatchEvent(new CustomEvent("cart-updated", { detail: { count: 0 } }))
         fetch(`${BASE_URL}/api/cart/clear`, { method: "DELETE", headers: userAuthHeaders() })
+        router.push(`/order-success?${params}`)
       }, 2500)
     } catch (err) {
       setStatus("error")
@@ -335,11 +300,11 @@ export default function CheckoutView() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {items.map((item) => {
-                    const isSelected = selectedIds.has(pid(item))
-                    const imgSrc = getImageUrl(pfield(item, "image") ?? null)
+                    const isSelected = selectedIds.has(item.productId)
+                    const imgSrc = getImageUrl(item.image ?? null)
                     return (
                       <div
-                        key={pid(item)}
+                        key={item.productId}
                         className={[
                           "flex gap-4 py-4 transition-opacity",
                           isSelected ? "opacity-100" : "opacity-40",
@@ -350,7 +315,7 @@ export default function CheckoutView() {
                         <div className="flex items-start pt-1">
                           <button
                             type="button"
-                            onClick={() => toggleItem(pid(item))}
+                            onClick={() => toggleItem(item.productId)}
                             className={[
                               "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all",
                               isSelected
@@ -367,7 +332,7 @@ export default function CheckoutView() {
                         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
                           {imgSrc ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imgSrc} alt={pname(item)}
+                            <img src={imgSrc} alt={item.name}
                               className="h-full w-full object-cover" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center">
@@ -379,21 +344,8 @@ export default function CheckoutView() {
                         {/* Details */}
                         <div className="flex flex-1 flex-col gap-1 min-w-0">
                           <p className="truncate text-[0.88rem] font-semibold text-gray-900">
-                            {pname(item)}
+                            {item.name}
                           </p>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[0.72rem] text-gray-400">
-                              SKU: <span className="font-mono">{pfield(item, "sku") ?? "—"}</span>
-                            </span>
-                            <span className={[
-                              "rounded-full px-2 py-0.5 text-[0.65rem] font-semibold",
-                              pfield(item, "stock") === false
-                                ? "bg-red-50 text-red-500"
-                                : "bg-green-50 text-green-600",
-                            ].join(" ")}>
-                              {pfield(item, "stock") === false ? "Out of Stock" : "In Stock"}
-                            </span>
-                          </div>
                         </div>
 
                         {/* Qty + Price */}
@@ -404,7 +356,7 @@ export default function CheckoutView() {
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleQty(pid(item), pname(item), item.quantity, item.price, -1)}
+                              onClick={() => handleQty(item.productId, item.name, item.quantity, item.price, -1)}
                               className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-400 transition-colors hover:border-gray-900 hover:bg-gray-900 hover:text-white"
                               aria-label="Decrease"
                             >
@@ -415,7 +367,7 @@ export default function CheckoutView() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => handleQty(pid(item), pname(item), item.quantity, item.price, 1)}
+                              onClick={() => handleQty(item.productId, item.name, item.quantity, item.price, 1)}
                               className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-400 transition-colors hover:border-gray-900 hover:bg-gray-900 hover:text-white"
                               aria-label="Increase"
                             >

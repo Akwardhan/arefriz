@@ -54,14 +54,27 @@ export default function LoginPage() {
 
       if (res.ok) {
         const role = (data.user?.role ?? decodeJwtRole(data.token))?.toLowerCase()
+        if (role === "dealer") {
+          setError("Please use the Dealer Portal to sign in.")
+          return
+        }
+        if (role === "admin") {
+          setError("Please use the Admin Console to sign in.")
+          return
+        }
         if (role !== "buyer") {
           setError("Invalid credentials")
           return
         }
         sessionStorage.removeItem("adminToken")
+
+        const raw  = data.user
+        const user = { ...raw, id: raw.id || raw._id }
         localStorage.setItem("userToken", data.token)
-        localStorage.setItem("user", JSON.stringify(data.user))
+        localStorage.setItem("user", JSON.stringify(user))
+
         window.location.href = "/"
+        window.location.reload()
       } else {
         setError(data.message)
       }

@@ -14,6 +14,7 @@ export interface Product {
   description: string;
   image: string;
   specs: ProductSpec[];
+  dealerName?: string;
 }
 
 const placeholder = (label: string) =>

@@ -16,6 +16,8 @@ const productSchema = new mongoose.Schema(
     image: { type: String },
     images: [{ type: String }],
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    dealerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer', default: null },
+    dealerName: { type: String, default: null },
     status: { type: String, enum: ['pending', 'approved'], default: 'approved' },
   },
   { timestamps: true }

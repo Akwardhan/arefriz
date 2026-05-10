@@ -161,6 +161,7 @@ export default function ProductListing({ initialProducts }: Props) {
                   price={p.price}
                   description={p.description}
                   href={`/product/${p._id}`}
+                  dealerName={p.dealerName}
                 />
               ))}
             </div>

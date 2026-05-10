@@ -326,3 +326,192 @@ Authorization: Bearer <token>
 ```
 
 **Response:** Array of inquiry objects, latest first.
+
+---
+
+## Admin — Dealers
+
+### GET /api/admin/dealers
+Get all dealers. Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{ "dealers": [...] }
+```
+
+> Password field is excluded from response.
+
+---
+
+### POST /api/admin/dealers
+Create a dealer account manually. Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Body:**
+```json
+{
+  "name": "John Dealer",
+  "companyName": "Dealer Co.",
+  "email": "dealer@example.com",
+  "password": "123456",
+  "phone": "9999999999"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Dealer created successfully",
+  "dealerId": "<dealerId>"
+}
+```
+
+---
+
+## Dealer Auth
+
+### POST /api/dealer/register
+Register a new dealer account.
+
+**Body:**
+```json
+{
+  "name": "John Dealer",
+  "companyName": "Dealer Co.",
+  "email": "dealer@example.com",
+  "password": "123456",
+  "phone": "9999999999"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Dealer registered successfully",
+  "dealerId": "<dealerId>"
+}
+```
+
+---
+
+### POST /api/dealer/login
+Login as a dealer.
+
+**Body:**
+```json
+{
+  "email": "dealer@example.com",
+  "password": "123456"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "<jwt_token>",
+  "dealer": {
+    "id": "<dealerId>",
+    "name": "John Dealer",
+    "companyName": "Dealer Co.",
+    "email": "dealer@example.com"
+  }
+}
+```
+
+> JWT payload includes `dealerId` and `role: "dealer"`.
+
+---
+
+## Dealer Products
+
+All routes require dealer JWT token.
+
+**Headers:**
+```
+Authorization: Bearer <dealer_token>
+```
+
+### POST /api/dealer/products
+Add a new product. Accepts `multipart/form-data`.
+
+**Body (form fields):**
+```
+name, brand, category, price, description, type, sku,
+shortDescription, specs, stock, installationCost, image (file)
+```
+
+**Response:** Created product object.
+
+---
+
+### GET /api/dealer/products
+Get all products belonging to the authenticated dealer.
+
+**Response:** Array of product objects.
+
+---
+
+### PUT /api/dealer/products/:id
+Update a dealer's own product. Accepts `multipart/form-data`.
+
+**Body (form fields):** Same as POST, all optional.
+
+**Response:** Updated product object.
+
+> Returns 404 if product not found or belongs to another dealer.
+
+---
+
+### DELETE /api/dealer/products/:id
+Delete a dealer's own product.
+
+**Response:**
+```json
+{ "message": "Product deleted successfully" }
+```
+
+> Returns 404 if product not found or belongs to another dealer.
+
+---
+
+## Dealer Orders
+
+### GET /api/dealer/orders
+Get all orders assigned to the authenticated dealer.
+
+**Headers:**
+```
+Authorization: Bearer <dealer_token>
+```
+
+**Response:** Array of order objects where `dealerId` matches the dealer.
+
+---
+
+### PATCH /api/dealer/orders/:id/status
+Update status of dealer's own order.
+
+**Headers:**
+```
+Authorization: Bearer <dealer_token>
+```
+
+**Body:**
+```json
+{ "status": "shipped" }
+```
+
+> Valid statuses: `processing`, `shipped`, `delivered`
+
+**Response:** Updated order object.
+
+> Returns 404 if order not found or belongs to another dealer.

@@ -1,48 +1,58 @@
 "use client"
 
 import { useState } from "react"
-import { ShoppingCart, Check, AlertCircle, Loader2 } from "lucide-react"
+import { Check, AlertCircle, Loader2 } from "lucide-react"
 import { BASE_URL } from "@/lib/config"
-import { userAuthHeaders } from "@/lib/auth"
 
 interface Props {
-  productId: string
-  name: string
-  price: number
+  product: {
+    _id:    string
+    name:   string
+    price:  number
+    image?: string
+  }
   className?: string
-  children?: React.ReactNode
+  children?:  React.ReactNode
 }
 
 type Status = "idle" | "loading" | "success" | "error"
 
-export default function AddToCartButton({ productId, name, price, className, children }: Props) {
+export default function AddToCartButton({ product, className, children }: Props) {
   const [status, setStatus] = useState<Status>("idle")
 
-  async function handleClick(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (status === "loading") return
+  const addToCart = async () => {
+    const token = localStorage.getItem("userToken")
+    console.log("TOKEN:", token)
+
+    if (!token) {
+      alert("Login first")
+      return
+    }
 
     setStatus("loading")
     try {
       const res = await fetch(`${BASE_URL}/api/cart/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
-        body: JSON.stringify({ productId, name, quantity: 1, price }),
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:  `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          productId: product._id,
+          name:      product.name,
+          price:     product.price,
+          image:     product.image,
+          quantity:  1,
+        }),
       })
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        console.error("[AddToCart] failed:", res.status, data)
-        setStatus("error")
-        setTimeout(() => setStatus("idle"), 2000)
-        return
-      }
-
+      if (!res.ok) throw new Error(`${res.status}`)
+      const data = await res.json()
+      window.dispatchEvent(new CustomEvent("cart-updated", { detail: { items: data.items || data.products } }))
       setStatus("success")
-      window.dispatchEvent(new Event("cart-updated"))
       setTimeout(() => setStatus("idle"), 1500)
     } catch (err) {
-      console.error("[AddToCart] network error:", err)
+      console.error(err)
       setStatus("error")
       setTimeout(() => setStatus("idle"), 2000)
     }
@@ -50,15 +60,14 @@ export default function AddToCartButton({ productId, name, price, className, chi
 
   return (
     <button
-      onClick={handleClick}
+      onClick={(e) => { e.stopPropagation(); addToCart() }}
       disabled={status === "loading"}
       className={className}
     >
-      {status === "loading" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-      {status === "success" && <Check className="mr-1.5 h-3.5 w-3.5" />}
+      {status === "loading" && <Loader2    className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+      {status === "success" && <Check      className="mr-1.5 h-3.5 w-3.5" />}
       {status === "error"   && <AlertCircle className="mr-1.5 h-3.5 w-3.5" />}
       {status === "idle"    && children}
-
       {status === "loading" && "Adding…"}
       {status === "success" && "Added!"}
       {status === "error"   && "Failed"}

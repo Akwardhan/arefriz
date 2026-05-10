@@ -32,6 +32,10 @@ interface Order {
   techSurcharge:    number
   taxes:            number
   totalAmount:      number
+  adminAmount?:     number
+  dealerAmount?:    number
+  dealerName?:      string
+  dealerPaid?:      boolean
   orderStatus:      string
   createdAt:        string
 }
@@ -356,6 +360,8 @@ function OrderCard({
   const [done,          setDone]          = useState<StatusKey | null>(null)
   const [expanded,      setExpanded]      = useState(false)
   const [sendingDealer, setSendingDealer] = useState(false)
+  const [payingDealer,  setPayingDealer]  = useState(false)
+  const [dealerPaid,    setDealerPaid]    = useState(order.dealerPaid ?? false)
   const [toast,         setToast]         = useState<string | null>(null)
 
   const handleSendToDealer = async (orderId: string) => {
@@ -375,6 +381,24 @@ function OrderCard({
       alert("Failed to send email")
     } finally {
       setSendingDealer(false)
+    }
+  }
+
+  const handlePayDealer = async () => {
+    if (dealerPaid || payingDealer) return
+    setPayingDealer(true)
+    try {
+      const res = await fetch(`${BASE_URL}/api/admin/orders/${order._id}/pay-dealer`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
+      })
+      if (!res.ok) throw new Error()
+      setDealerPaid(true)
+      setOrders(prev => prev.map(o => o._id === order._id ? { ...o, dealerPaid: true } : o))
+    } catch {
+      alert("Failed to mark dealer payment")
+    } finally {
+      setPayingDealer(false)
     }
   }
 
@@ -470,12 +494,17 @@ function OrderCard({
             )
           })()}
 
-          {/* Col 2 — Order ID + date */}
+          {/* Col 2 — Order ID + date + dealer */}
           <div className="min-w-0 text-center">
             <p className="text-sm font-semibold truncate" style={{ color: "#111827" }}>
               {order.orderId ?? `#${order._id.slice(-8).toUpperCase()}`}
             </p>
             <p className="mt-0.5 text-xs" style={{ color: "#9CA3AF" }}>{date}</p>
+            {order.dealerName && (
+              <p className="mt-0.5 text-[11px] font-medium truncate" style={{ color: "#6366F1" }}>
+                {order.dealerName}
+              </p>
+            )}
           </div>
 
           {/* Col 3 — Customer */}
@@ -630,10 +659,35 @@ function OrderCard({
                     <span className="text-sm tabular-nums" style={{ color: "#374151" }}>{fmt(r.val)}</span>
                   </div>
                 ))}
-                <div className="flex items-center justify-between px-5 py-4" style={{ background: "#FAFAFA" }}>
+                <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#F3F4F6", background: "#FAFAFA" }}>
                   <span className="text-sm font-semibold" style={{ color: "#111827" }}>Total</span>
                   <span className="text-base font-bold tabular-nums" style={{ color: "#111827" }}>{fmt(order.totalAmount)}</span>
                 </div>
+                {/* Split: admin commission + dealer amount */}
+                {(order.adminAmount != null || order.dealerAmount != null) && (
+                  <div className="divide-y" style={{ borderColor: "#F3F4F6" }}>
+                    {order.adminAmount != null && (
+                      <div className="flex items-center justify-between px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#6366F1" }} />
+                          <span className="text-sm font-medium" style={{ color: "#6366F1" }}>Commission (Admin)</span>
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: "#6366F1" }}>{fmt(order.adminAmount)}</span>
+                      </div>
+                    )}
+                    {order.dealerAmount != null && (
+                      <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#10B981" }} />
+                          <span className="text-sm font-medium" style={{ color: "#059669" }}>
+                            Dealer Amount{order.dealerName ? ` · ${order.dealerName}` : ""}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: "#059669" }}>{fmt(order.dealerAmount)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {order.installationCost > 0 && (
                   <div className="flex items-center gap-2 border-t px-5 py-3" style={{ borderColor: "#F3F4F6", background: "#F0FDF4" }}>
                     <Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: "#166534" }} />
@@ -692,7 +746,7 @@ function OrderCard({
                 </div>
 
                 {/* Send to Dealer row */}
-                <div className="flex items-center justify-between px-5 py-4">
+                <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "#F3F4F6" }}>
                   <div>
                     <p className="text-sm font-medium" style={{ color: "#111827" }}>Send to Dealer</p>
                     <p className="mt-0.5 text-xs" style={{ color: "#9CA3AF" }}>Forward order details by email</p>
@@ -709,6 +763,42 @@ function OrderCard({
                     }
                     Send
                   </button>
+                </div>
+
+                {/* Pay Dealer row */}
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "#111827" }}>Pay Dealer</p>
+                    <p className="mt-0.5 text-xs" style={{ color: "#9CA3AF" }}>
+                      {order.dealerAmount != null
+                        ? `Mark ${fmt(order.dealerAmount)} as paid to ${order.dealerName ?? "dealer"}`
+                        : "Mark dealer payment as settled"}
+                    </p>
+                  </div>
+                  {dealerPaid ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
+                      style={{ background: "#F0FDF4", color: "#166534", border: "1px solid #DCFCE7" }}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Paid
+                    </span>
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); handlePayDealer() }}
+                      disabled={payingDealer}
+                      className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-150 disabled:opacity-60"
+                      style={{ background: "#059669", color: "#fff" }}
+                      onMouseEnter={e => { if (!payingDealer) e.currentTarget.style.background = "#047857" }}
+                      onMouseLeave={e => { if (!payingDealer) e.currentTarget.style.background = "#059669" }}
+                    >
+                      {payingDealer
+                        ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        : <CheckCircle2 className="h-3.5 w-3.5" />
+                      }
+                      Pay Dealer
+                    </button>
+                  )}
                 </div>
 
               </div>

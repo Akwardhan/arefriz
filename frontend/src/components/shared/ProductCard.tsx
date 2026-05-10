@@ -7,7 +7,6 @@ import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getImageUrl } from "@/lib/imageUrl"
 import { BASE_URL } from "@/lib/config"
-import { userAuthHeaders } from "@/lib/auth"
 
 interface ProductCardProps {
   id?: string
@@ -17,6 +16,7 @@ interface ProductCardProps {
   price: number
   description?: string
   href?: string
+  dealerName?: string
 }
 
 type CartStatus = "idle" | "loading" | "success" | "error"
@@ -29,6 +29,7 @@ export default function ProductCard({
   price,
   description,
   href = "#",
+  dealerName,
 }: ProductCardProps) {
   const router = useRouter()
   const [cartStatus, setCartStatus] = useState<CartStatus>("idle")
@@ -39,30 +40,30 @@ export default function ProductCard({
     maximumFractionDigits: 0,
   }).format(price)
 
-  async function handleAddToCart(productId: string) {
+  async function handleAddToCart(e: React.MouseEvent) {
+    e.stopPropagation()
     if (cartStatus === "loading") return
+
+    const token = localStorage.getItem("userToken")
+    console.log("TOKEN:", token)
+    if (!token) {
+      alert("Login first")
+      return
+    }
+
     setCartStatus("loading")
     try {
-      console.log("[AddToCart] payload:", { productId, quantity: 1, price })
       const res = await fetch(`${BASE_URL}/api/cart/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...userAuthHeaders() },
-        body: JSON.stringify({ productId, name, quantity: 1, price }),
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ productId: id, name, price, image: image ?? undefined, quantity: 1 }),
       })
-      if (!res.ok) {
-        const text = await res.text()
-        let data: unknown = {}
-        try { data = JSON.parse(text) } catch { data = text }
-        console.error("[AddToCart] failed:", res.status, data)
-        setCartStatus("error")
-        setTimeout(() => setCartStatus("idle"), 2000)
-        return
-      }
+      if (!res.ok) throw new Error(`${res.status}`)
+      const data = await res.json()
+      window.dispatchEvent(new CustomEvent("cart-updated", { detail: { items: data.items || data.products } }))
       setCartStatus("success")
-      window.dispatchEvent(new Event("cart-updated"))
       setTimeout(() => setCartStatus("idle"), 1500)
-    } catch (err) {
-      console.error("[AddToCart] network error:", err)
+    } catch {
       setCartStatus("error")
       setTimeout(() => setCartStatus("idle"), 2000)
     }
@@ -97,6 +98,13 @@ export default function ProductCard({
           {brand}
         </p>
 
+        {/* Dealer label */}
+        {dealerName && (
+          <p className="text-[0.68rem] text-gray-400 -mt-1.5">
+            Sold by <span className="font-semibold text-gray-600">{dealerName}</span>
+          </p>
+        )}
+
         {/* Name */}
         <h3 className="text-[0.95rem] font-semibold leading-snug text-gray-900">
           {name}
@@ -123,10 +131,7 @@ export default function ProductCard({
             buttonVariants({ size: "sm" }),
             "h-8 w-full rounded-lg px-3 text-xs font-semibold inline-flex items-center justify-center cursor-pointer",
           )}
-          onClick={(e) => {
-            e.stopPropagation()
-            handleAddToCart(id)
-          }}
+          onClick={handleAddToCart}
         >
           {cartStatus === "idle"    && <ShoppingCart className="mr-1.5 h-3.5 w-3.5" />}
           {cartStatus === "loading" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
