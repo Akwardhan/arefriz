@@ -11,6 +11,27 @@ router.get('/', protect, adminMiddleware, getOrders);
 // PATCH /api/admin/orders/:id — update orderStatus
 router.patch('/:id', protect, adminMiddleware, updateOrderStatus);
 
+// PATCH /api/admin/orders/:id/pay-dealer — mark dealer as paid
+router.patch('/:id/pay-dealer', protect, adminMiddleware, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (order.orderStatus !== 'delivered') {
+      return res.status(400).json({ message: 'Order must be delivered before paying dealer' });
+    }
+
+    order.dealerPaid = true;
+    order.paymentStatus = 'paid';
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    console.error('pay-dealer error:', err);
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+});
+
 // POST /api/admin/orders/:id/send-to-dealer
 router.post('/:id/send-to-dealer', protect, adminMiddleware, async (req, res) => {
   try {

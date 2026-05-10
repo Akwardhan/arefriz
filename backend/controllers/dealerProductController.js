@@ -56,8 +56,17 @@ const addDealerProduct = async (req, res) => {
 
 const getDealerProducts = async (req, res) => {
   try {
-    const products = await Product.find({ dealerId: req.dealer.id });
-    res.json(products);
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(200, parseInt(req.query.limit) || 100);
+    const skip  = (page - 1) * limit;
+
+    const filter = { dealerId: req.dealer.id };
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Product.countDocuments(filter),
+    ]);
+
+    res.json({ products, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('getDealerProducts error:', err);
     res.status(500).json({ message: err.message || 'Server error' });

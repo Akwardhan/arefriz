@@ -3,8 +3,6 @@ const jwt = require('jsonwebtoken');
 const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  console.log("AUTH HEADER:", authHeader);
-
   if (!authHeader) {
     return res.status(401).json({ message: "No Authorization header" });
   }
@@ -19,14 +17,9 @@ const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    console.log("DECODED:", decoded);
-
     req.user = { id: decoded.userId || decoded.id, role: decoded.role };
-
     next();
-  } catch (error) {
-    console.log("JWT ERROR:", error.message);
+  } catch {
     return res.status(401).json({ message: "Invalid token" });
   }
 };

@@ -32,11 +32,13 @@ interface Order {
   techSurcharge:    number
   taxes:            number
   totalAmount:      number
-  adminAmount?:     number
-  dealerAmount?:    number
-  dealerName?:      string
-  dealerPaid?:      boolean
-  orderStatus:      string
+  adminAmount?:       number
+  dealerAmount?:      number
+  dealerName?:        string
+  dealerPaid?:        boolean
+  commissionPercent?: number
+  paymentStatus?:     string
+  orderStatus:        string
   createdAt:        string
 }
 
@@ -111,10 +113,13 @@ const getCustomer = (order: Order) => ({
 export default function OrdersPanel() {
   const router = useRouter()
 
-  const [orders,  setOrders]  = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter,  setFilter]  = useState<StatusKey | "all">("all")
-  const [search,  setSearch]  = useState("")
+  const [orders,       setOrders]       = useState<Order[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [filter,       setFilter]       = useState<StatusKey | "all">("all")
+  const [search,       setSearch]       = useState("")
+  const [dealerSearch, setDealerSearch] = useState("")
+  const [productSearch,setProductSearch]= useState("")
+  const [sortDate,     setSortDate]     = useState<"newest" | "oldest">("newest")
 
   function handleLogout() {
     sessionStorage.removeItem("adminToken")
@@ -141,23 +146,36 @@ export default function OrdersPanel() {
     await fetch(`${BASE_URL}/api/orders/${orderId}/status`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
-      body:    JSON.stringify({ orderStatus: status }),
+      body:    JSON.stringify({ status }),
     })
   }
 
   useEffect(() => { fetchOrders() }, [])
 
-  const q = search.trim().toLowerCase()
+  const q  = search.trim().toLowerCase()
+  const dq = dealerSearch.trim().toLowerCase()
+  const pq = productSearch.trim().toLowerCase()
 
-  const visible = orders.filter(o => {
-    if (filter !== "all" && resolveStatus(o.orderStatus) !== filter) return false
-    if (q) {
-      const c = getCustomer(o)
-      const id = (o.orderId ?? o._id).toLowerCase()
-      if (!id.includes(q) && !c.name.toLowerCase().includes(q) && !c.phone.toLowerCase().includes(q)) return false
-    }
-    return true
-  })
+  const visible = orders
+    .filter(o => {
+      if (filter !== "all" && resolveStatus(o.orderStatus) !== filter) return false
+      if (q) {
+        const c  = getCustomer(o)
+        const id = (o.orderId ?? o._id).toLowerCase()
+        if (!id.includes(q) && !c.name.toLowerCase().includes(q) && !c.phone.toLowerCase().includes(q)) return false
+      }
+      if (dq && !(o.dealerName ?? "").toLowerCase().includes(dq)) return false
+      if (pq) {
+        const hit = (o.products ?? []).some(p => getProductName(p).toLowerCase().includes(pq))
+        if (!hit) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime()
+      const tb = new Date(b.createdAt).getTime()
+      return sortDate === "oldest" ? ta - tb : tb - ta
+    })
 
   const counts = {
     all:        orders.length,
@@ -292,6 +310,64 @@ export default function OrdersPanel() {
           </div>
         </div>
 
+        {/* ── Additional filters ────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#D1D5DB" }} />
+            <input
+              type="text"
+              value={dealerSearch}
+              onChange={e => setDealerSearch(e.target.value)}
+              placeholder="Filter by dealer / company name…"
+              className="h-9 w-full rounded-lg border bg-white pl-9 pr-8 text-sm outline-none transition-all"
+              style={{ borderColor: "#F3F4F6", color: "#111827" }}
+              onFocus={e => { e.currentTarget.style.borderColor = "#D1D5DB"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,0,0,0.04)" }}
+              onBlur={e  => { e.currentTarget.style.borderColor = "#F3F4F6"; e.currentTarget.style.boxShadow = "none" }}
+            />
+            {dealerSearch && (
+              <button
+                onClick={() => setDealerSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors duration-150 text-base leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#D1D5DB" }} />
+            <input
+              type="text"
+              value={productSearch}
+              onChange={e => setProductSearch(e.target.value)}
+              placeholder="Filter by product name…"
+              className="h-9 w-full rounded-lg border bg-white pl-9 pr-8 text-sm outline-none transition-all"
+              style={{ borderColor: "#F3F4F6", color: "#111827" }}
+              onFocus={e => { e.currentTarget.style.borderColor = "#D1D5DB"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,0,0,0.04)" }}
+              onBlur={e  => { e.currentTarget.style.borderColor = "#F3F4F6"; e.currentTarget.style.boxShadow = "none" }}
+            />
+            {productSearch && (
+              <button
+                onClick={() => setProductSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors duration-150 text-base leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <div className="relative shrink-0">
+            <select
+              value={sortDate}
+              onChange={e => setSortDate(e.target.value as "newest" | "oldest")}
+              className="h-9 appearance-none rounded-lg border bg-white pl-3 pr-8 text-sm font-medium outline-none transition-all"
+              style={{ borderColor: "#F3F4F6", color: "#6B7280" }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "#9CA3AF" }} />
+          </div>
+        </div>
+
         {/* ── Skeleton ──────────────────────────────────────────────────────────── */}
         {loading && (
           <div className="space-y-3">
@@ -309,10 +385,10 @@ export default function OrdersPanel() {
             </div>
             <div>
               <p className="text-sm font-semibold" style={{ color: "#6B7280" }}>
-                {q ? `No results for "${search}"` : filter === "all" ? "No orders yet" : `No ${filter} orders`}
+                {(q || dq || pq) ? "No results for this search" : filter === "all" ? "No orders yet" : `No ${filter} orders`}
               </p>
               <p className="mt-1 text-xs" style={{ color: "#9CA3AF" }}>
-                {q ? "Try a different search term" : "Orders will appear here once placed"}
+                {(q || dq || pq) ? "Try adjusting your filters" : "Orders will appear here once placed"}
               </p>
             </div>
           </div>
@@ -670,7 +746,9 @@ function OrderCard({
                       <div className="flex items-center justify-between px-5 py-3">
                         <div className="flex items-center gap-2">
                           <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#6366F1" }} />
-                          <span className="text-sm font-medium" style={{ color: "#6366F1" }}>Commission (Admin)</span>
+                          <span className="text-sm font-medium" style={{ color: "#6366F1" }}>
+                            Commission (Admin{order.commissionPercent != null ? ` · ${order.commissionPercent}%` : ""})
+                          </span>
                         </div>
                         <span className="text-sm font-semibold tabular-nums" style={{ color: "#6366F1" }}>{fmt(order.adminAmount)}</span>
                       </div>
@@ -686,6 +764,21 @@ function OrderCard({
                         <span className="text-sm font-semibold tabular-nums" style={{ color: "#059669" }}>{fmt(order.dealerAmount)}</span>
                       </div>
                     )}
+                  </div>
+                )}
+                {order.paymentStatus && (
+                  <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: "#F3F4F6" }}>
+                    <span className="text-sm" style={{ color: "#6B7280" }}>Payment Status</span>
+                    <span
+                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                      style={{
+                        background: order.paymentStatus === "paid" ? "#F0FDF4" : order.paymentStatus === "released" ? "#EFF6FF" : "#FEF9C3",
+                        color:      order.paymentStatus === "paid" ? "#166534" : order.paymentStatus === "released" ? "#1D4ED8" : "#854D0E",
+                        border:     `1px solid ${order.paymentStatus === "paid" ? "#DCFCE7" : order.paymentStatus === "released" ? "#DBEAFE" : "#FEF08A"}`,
+                      }}
+                    >
+                      {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                    </span>
                   </div>
                 )}
                 {order.installationCost > 0 && (
@@ -765,8 +858,8 @@ function OrderCard({
                   </button>
                 </div>
 
-                {/* Pay Dealer row */}
-                <div className="flex items-center justify-between px-5 py-4">
+                {/* Pay Dealer row — only visible once delivered */}
+                {statusKey === "delivered" && <div className="flex items-center justify-between px-5 py-4">
                   <div>
                     <p className="text-sm font-medium" style={{ color: "#111827" }}>Pay Dealer</p>
                     <p className="mt-0.5 text-xs" style={{ color: "#9CA3AF" }}>
@@ -799,7 +892,7 @@ function OrderCard({
                       Pay Dealer
                     </button>
                   )}
-                </div>
+                </div>}
 
               </div>
             </div>

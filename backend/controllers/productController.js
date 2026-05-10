@@ -19,20 +19,32 @@ const addProduct = async (req, res) => {
 };
 
 const getProducts = async (req, res) => {
-  const { category, brand, type, minPrice, maxPrice } = req.query;
+  try {
+    const { category, brand, type, minPrice, maxPrice } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(200, parseInt(req.query.limit) || 100);
+    const skip  = (page - 1) * limit;
 
-  const filter = { status: 'approved' };
-  if (category) filter.category = category;
-  if (brand) filter.brand = brand;
-  if (type) filter.type = type;
-  if (minPrice || maxPrice) {
-    filter.price = {};
-    if (minPrice) filter.price.$gte = Number(minPrice);
-    if (maxPrice) filter.price.$lte = Number(maxPrice);
+    const filter = { status: 'approved' };
+    if (category) filter.category = category;
+    if (brand)    filter.brand    = brand;
+    if (type)     filter.type     = type;
+    if (minPrice || maxPrice) {
+      filter.price = {};
+      if (minPrice) filter.price.$gte = Number(minPrice);
+      if (maxPrice) filter.price.$lte = Number(maxPrice);
+    }
+
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Product.countDocuments(filter),
+    ]);
+
+    res.json({ products, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error('getProducts error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
-
-  const products = await Product.find(filter);
-  res.json(products);
 };
 
 const getProductById = async (req, res) => {

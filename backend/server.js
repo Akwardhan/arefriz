@@ -13,6 +13,19 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', require('express').static('uploads'));
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    if (ms > 500) {
+      console.warn(`SLOW ${req.method} ${req.path} ${res.statusCode} ${ms}ms`);
+    } else {
+      console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms`);
+    }
+  });
+  next();
+});
+
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));

@@ -43,7 +43,8 @@ export default function FeaturedProducts() {
     try {
       const res = await fetch(API_URL);
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-      const raw: RawProduct[] = await res.json();
+      const json = await res.json();
+      const raw: RawProduct[] = Array.isArray(json) ? json : (json?.products ?? []);
       // Normalise: handle MongoDB _id and missing/empty images
       const data: Product[] = raw.map((p, i) => ({
         id: p._id ?? p.id ?? String(i),

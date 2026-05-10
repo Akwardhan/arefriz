@@ -29,7 +29,7 @@ Register a new user.
 ---
 
 ### POST /api/auth/login
-Login and receive a JWT token.
+Login as a buyer/user and receive a JWT token.
 
 **Body:**
 ```json
@@ -47,6 +47,31 @@ Login and receive a JWT token.
     "name": "John Doe",
     "email": "john@example.com",
     "role": "buyer"
+  }
+}
+```
+
+---
+
+### POST /api/admin/login
+Login as an admin and receive a JWT token.
+
+**Body:**
+```json
+{
+  "email": "admin@example.com",
+  "password": "adminpassword"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "<jwt_token>",
+  "user": {
+    "name": "Admin",
+    "email": "admin@example.com",
+    "role": "admin"
   }
 }
 ```
@@ -98,8 +123,15 @@ name, brand, category, price, description, image (file)
 
 ## Cart
 
+All cart routes require authentication.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
 ### POST /api/cart/add
-Add a product to the cart (no auth required — cart is session-global).
+Add a product to the cart.
 
 **Body:**
 ```json
@@ -115,7 +147,7 @@ Add a product to the cart (no auth required — cart is session-global).
 ---
 
 ### GET /api/cart
-Get the current cart.
+Get the current user's cart.
 
 **Response:**
 ```json
@@ -130,6 +162,21 @@ Get the current cart.
   "totalAmount": 120
 }
 ```
+
+---
+
+### PATCH /api/cart/update
+Update the quantity of an item already in the cart.
+
+**Body:**
+```json
+{
+  "productId": "<productId>",
+  "quantity": 3
+}
+```
+
+**Response:** Updated cart object.
 
 ---
 
@@ -184,7 +231,7 @@ Authorization: Bearer <token>
 { "orderId": "<orderId>" }
 ```
 
-> Clears the cart automatically after a successful order.
+> Clears the cart automatically after a successful order. Dealer info (`dealerId`, `dealerName`), commission split (`commissionPercent`, `adminAmount`, `dealerAmount`), and `paymentStatus: "pending"` are resolved server-side from the product records.
 
 ---
 
@@ -224,7 +271,7 @@ Authorization: Bearer <token>
 
 **Body:**
 ```json
-{ "status": "processing" }
+{ "status": "shipped" }
 ```
 
 > Valid statuses: `processing`, `shipped`, `delivered`, `cancelled`
@@ -256,17 +303,17 @@ Authorization: Bearer <token>
 
 ---
 
-## Admin Orders (dedicated admin prefix)
+## Admin — Orders
 
 ### GET /api/admin/orders
-Get all orders. Admin only.
+Get all orders, latest first. Admin only.
 
 **Headers:**
 ```
 Authorization: Bearer <token>
 ```
 
-**Response:** Array of all order objects, latest first.
+**Response:** Array of all order objects.
 
 ---
 
@@ -289,43 +336,39 @@ Authorization: Bearer <token>
 
 ---
 
-## Inquiries
-
-### POST /api/inquiries
-Submit a product inquiry. No authentication required.
-
-**Body:**
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "phone": "9999999999",
-  "message": "Is this available in blue?",
-  "productId": "<productId>"
-}
-```
-
-> `productId` is optional. `name`, `email`, `phone`, and `message` are required.
-
-**Response:**
-```json
-{
-  "message": "Inquiry submitted successfully",
-  "inquiryId": "<inquiryId>"
-}
-```
-
----
-
-### GET /api/inquiries
-Get all inquiries. Admin only.
+### PATCH /api/admin/orders/:id/pay-dealer
+Mark dealer payment as settled. Admin only. Order must have `orderStatus: "delivered"`.
 
 **Headers:**
 ```
 Authorization: Bearer <token>
 ```
 
-**Response:** Array of inquiry objects, latest first.
+**Response:** Updated order object with `dealerPaid: true` and `paymentStatus: "paid"`.
+
+> Returns 400 if order is not yet delivered.
+
+---
+
+### POST /api/admin/orders/:id/send-to-dealer
+Send order details to a specific dealer via email. Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Body:**
+```json
+{ "dealerEmail": "dealer@example.com" }
+```
+
+**Response:**
+```json
+{ "message": "Order sent to dealer successfully" }
+```
+
+> Sets `emailSent: true` and `emailSentAt` on the order after a successful send.
 
 ---
 
@@ -369,11 +412,111 @@ Authorization: Bearer <token>
 
 **Response:**
 ```json
+{ "message": "Dealer created successfully" }
+```
+
+---
+
+## Admin — Products
+
+### GET /api/admin/products
+Get all products with optional filtering and sorting. Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+
+| Param     | Type   | Description                                                      |
+|-----------|--------|------------------------------------------------------------------|
+| `company` | string | Filter by dealer company name (omit or `all` for all companies)  |
+| `status`  | string | Filter by status: `approved`, `pending` (omit or `all` for all) |
+| `sort`    | string | `latest` (default), `oldest`, `price_high`, `price_low`         |
+
+**Response:**
+```json
 {
-  "message": "Dealer created successfully",
-  "dealerId": "<dealerId>"
+  "products": [
+    {
+      "_id": "<productId>",
+      "name": "Danfoss EVR 10",
+      "brand": "Danfoss",
+      "category": "valves",
+      "price": 4500,
+      "image": "/uploads/filename.jpg",
+      "status": "approved",
+      "dealerName": "ABC HVAC Co.",
+      "dealerId": "<dealerId>",
+      "createdAt": "2026-05-10T10:00:00.000Z"
+    }
+  ],
+  "companies": ["ABC HVAC Co.", "XYZ Parts Ltd."]
 }
 ```
+
+> `companies` is the list of unique dealer company names present in the DB — use it to populate the company filter dropdown.
+
+---
+
+### PATCH /api/admin/products/:id/status
+Toggle a product's visibility (approved ↔ pending). Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "_id": "<productId>",
+  "status": "pending"
+}
+```
+
+> No body required. Each call flips the status: `approved → pending` or `pending → approved`.
+
+---
+
+## Inquiries
+
+### POST /api/inquiries
+Submit a product inquiry. No authentication required.
+
+**Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "9999999999",
+  "message": "Is this available in blue?",
+  "productId": "<productId>"
+}
+```
+
+> `productId` is optional. `name`, `email`, `phone`, and `message` are required.
+
+**Response:**
+```json
+{
+  "message": "Inquiry submitted successfully",
+  "inquiryId": "<inquiryId>"
+}
+```
+
+---
+
+### GET /api/inquiries
+Get all inquiries. Admin only.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:** Array of inquiry objects, latest first.
 
 ---
 
@@ -427,7 +570,7 @@ Login as a dealer.
 }
 ```
 
-> JWT payload includes `dealerId` and `role: "dealer"`.
+> JWT payload includes `dealerId` and `role: "dealer"`. Account must be active (`isActive: true`) to log in.
 
 ---
 
@@ -441,15 +584,27 @@ Authorization: Bearer <dealer_token>
 ```
 
 ### POST /api/dealer/products
-Add a new product. Accepts `multipart/form-data`.
+Publish a new product. Accepts `multipart/form-data`.
 
 **Body (form fields):**
 ```
-name, brand, category, price, description, type, sku,
-shortDescription, specs, stock, installationCost, image (file)
+name* (required)
+brand* (required)
+category* (required)
+price* (required)
+description
+type
+sku
+shortDescription
+specs        (JSON string: [{ "key": "...", "value": "..." }])
+stock
+installationCost
+image        (file)
 ```
 
-**Response:** Created product object.
+> `specs` must be sent as a JSON-encoded string when using `multipart/form-data`; it is parsed server-side into an array. Product is auto-assigned `dealerId`, `dealerName`, and `status: "approved"`.
+
+**Response:** Created product object (201).
 
 ---
 
@@ -485,32 +640,29 @@ Delete a dealer's own product.
 
 ## Dealer Orders
 
-### GET /api/dealer/orders
-Get all orders assigned to the authenticated dealer.
+All routes require dealer JWT token.
 
 **Headers:**
 ```
 Authorization: Bearer <dealer_token>
 ```
 
-**Response:** Array of order objects where `dealerId` matches the dealer.
+### GET /api/dealer/orders
+Get all orders assigned to the authenticated dealer.
+
+**Response:** Array of order objects where `dealerId` matches the dealer, latest first.
 
 ---
 
 ### PATCH /api/dealer/orders/:id/status
-Update status of dealer's own order.
-
-**Headers:**
-```
-Authorization: Bearer <dealer_token>
-```
+Update status of the dealer's own order.
 
 **Body:**
 ```json
 { "status": "shipped" }
 ```
 
-> Valid statuses: `processing`, `shipped`, `delivered`
+> Valid statuses: `processing`, `shipped`, `delivered`, `cancelled`
 
 **Response:** Updated order object.
 

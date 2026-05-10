@@ -32,28 +32,34 @@ const createOrder = async (req, res) => {
 
     const { name, phone, address } = shippingDetails;
 
-    // --- Build product snapshot from DB + extract dealer info ---
-    const populatedProducts = [];
-    let dealerId = null;
-    let dealerName = null;
+    // --- Fetch all products in parallel ---
+    const productDocs = await Promise.all(
+      products.map(item =>
+        Product.findById(item.productId, 'name price image dealerId dealerName')
+      )
+    );
 
-    for (const item of products) {
-      const product = await Product.findById(item.productId);
-      if (!product) {
-        return res.status(404).json({ message: `Product not found: ${item.productId}` });
-      }
-      populatedProducts.push({
-        productId: item.productId,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        image: product.image || '',
-      });
-      if (product.dealerId && !dealerId) {
-        dealerId = product.dealerId;
-        dealerName = product.dealerName || null;
+    for (let i = 0; i < productDocs.length; i++) {
+      if (!productDocs[i]) {
+        return res.status(404).json({ message: `Product not found: ${products[i].productId}` });
       }
     }
+
+    let dealerId   = null;
+    let dealerName = null;
+    const populatedProducts = productDocs.map((product, i) => {
+      if (product.dealerId && !dealerId) {
+        dealerId   = product.dealerId;
+        dealerName = product.dealerName || null;
+      }
+      return {
+        productId: products[i].productId,
+        name:      product.name,
+        price:     product.price,
+        quantity:  products[i].quantity,
+        image:     product.image || '',
+      };
+    });
 
     // --- Compute total in backend ---
     const calculatedTotal =
@@ -105,19 +111,18 @@ const createOrder = async (req, res) => {
 
 const getOrders = async (req, res) => {
   try {
-    if (req.user.role === 'admin') {
-      const orders = await Order.find()
-        .populate("products.productId", "name price image")
-        .sort({ createdAt: -1 });
-      console.log(JSON.stringify(orders, null, 2));
-      return res.json(orders);
-    }
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(200, parseInt(req.query.limit) || 50);
+    const skip  = (page - 1) * limit;
 
-    const orders = await Order.find({ userId: req.user.id })
-      .populate("products.productId", "name price image")
-      .sort({ createdAt: -1 });
-    console.log(JSON.stringify(orders, null, 2));
-    res.json(orders);
+    const filter = req.user.role === 'admin' ? {} : { userId: req.user.id };
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Order.countDocuments(filter),
+    ]);
+
+    res.json({ orders, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('getOrders error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -238,9 +243,17 @@ const sendToDealer = async (req, res) => {
 
 const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user.userId })
-      .sort({ createdAt: -1 });
-    res.json(orders);
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const skip  = (page - 1) * limit;
+
+    const filter = { userId: req.user.id };
+    const [orders, total] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Order.countDocuments(filter),
+    ]);
+
+    res.json({ orders, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('getMyOrders error:', err);
     res.status(500).json({ message: 'Server error' });
