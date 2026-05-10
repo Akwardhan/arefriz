@@ -45,8 +45,8 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: ['upi', 'card', 'cod'], default: null },
     orderStatus: {
       type: String,
-      enum: ['placed', 'processing', 'shipped', 'delivered'],
-      default: 'placed',
+      enum: ['placed', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'processing',
     },
     statusHistory: [
       {
@@ -61,5 +61,9 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.index({ userId: 1, createdAt: -1 });
+orderSchema.index({ dealerId: 1, createdAt: -1 });
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);

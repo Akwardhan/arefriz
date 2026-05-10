@@ -1,5 +1,5 @@
-import AddProductPanel from "@/components/admin/AddProductPanel"
+import AdminProductsPanel from "@/components/admin/AdminProductsPanel"
 
 export default function AdminProductsPage() {
-  return <AddProductPanel />
+  return <AdminProductsPanel />
 }

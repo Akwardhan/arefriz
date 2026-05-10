@@ -18,6 +18,7 @@ interface PopulatedProduct {
 interface OrderProduct {
   productId?: string | PopulatedProduct
   name?:      string
+  image?:     string
   price?:     number
   quantity?:  number
 }
@@ -34,18 +35,13 @@ interface Order {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  processing: { label: "Processing", className: "bg-orange-100 text-orange-600" },
-  shipped:    { label: "Shipped",    className: "bg-blue-100 text-blue-600"     },
-  delivered:  { label: "Delivered",  className: "bg-gray-200 text-gray-600"     },
-  cancelled:  { label: "Cancelled",  className: "bg-red-100 text-red-600"       },
+  processing: { label: "Processing", className: "bg-amber-100 text-amber-700"  },
+  shipped:    { label: "Shipped",    className: "bg-blue-100 text-blue-600"    },
+  delivered:  { label: "Delivered",  className: "bg-green-100 text-green-700"  },
+  cancelled:  { label: "Cancelled",  className: "bg-red-100 text-red-600"      },
 }
 
-const ACTION: Record<string, { label: string; style: string } | null> = {
-  processing: { label: "Manage Items", style: "border border-gray-200 text-gray-700 hover:bg-gray-100" },
-  shipped:    { label: "Track Order",  style: "bg-blue-600 text-white hover:bg-blue-700"               },
-  delivered:  { label: "View Invoice", style: "bg-gray-100 text-gray-700 hover:bg-gray-200"            },
-  cancelled:  null,
-}
+const TRACKABLE = new Set(["processing", "shipped", "delivered"])
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
@@ -58,6 +54,7 @@ function fmtYear(s: string) {
 function getFirstImage(order: Order): string | undefined {
   const first = order.products?.[0]
   if (!first) return undefined
+  if (first.image) return first.image
   if (typeof first.productId === "object" && first.productId?.image) return first.productId.image
   return undefined
 }
@@ -67,10 +64,10 @@ function getOrderNumber(order: Order): string {
 }
 
 function getExtraCount(order: Order): number {
-  return Math.max(0, (order.products?.length ?? 1) - 1)
+  return Math.max(0, (order.products?.length ?? 0) - 2)
 }
 
-const YEARS    = ["All Years", "2025", "2024", "2023"]
+const YEARS    = ["All Years", "2026", "2025", "2024", "2023"]
 const STATUSES = ["All Statuses", "Processing", "Shipped", "Delivered", "Cancelled"]
 const PAGE_SIZE = 5
 
@@ -84,7 +81,9 @@ const TIMELINE = [
 
 function TrackModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const status = (order.orderStatus ?? "processing").toLowerCase()
-  const currentIdx = TIMELINE.findIndex(s => s.key === status)
+  const currentIdx = status === "delivered"
+    ? TIMELINE.length - 1
+    : TIMELINE.findIndex(s => s.key === status)
 
   return (
     <div
@@ -286,7 +285,6 @@ export default function OrdersPage() {
             {paginated.map(order => {
               const status  = (order.orderStatus ?? "processing").toLowerCase()
               const badge   = STATUS_BADGE[status] ?? STATUS_BADGE.processing
-              const action  = ACTION[status]        ?? ACTION.processing
               const img        = getFirstImage(order)
               const displayId  = getOrderNumber(order)
               const extraCount = getExtraCount(order)
@@ -309,15 +307,23 @@ export default function OrdersPage() {
                     )}
                   </div>
 
-                  {/* Col 2 — Order number */}
+                  {/* Col 2 — Order number + products */}
                   <div className="self-center" style={{ minWidth: 0 }}>
                     <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1">Order Number</p>
                     <p className="font-semibold text-gray-900 truncate">{displayId}</p>
-                    {extraCount > 0 && (
-                      <p className="mt-1 text-xs text-gray-400">
-                        +{extraCount} more item{extraCount > 1 ? "s" : ""}
-                      </p>
-                    )}
+                    <div className="mt-2 space-y-0.5">
+                      {(order.products ?? []).slice(0, 2).map((item, i) => {
+                        const name = item.name || (typeof item.productId === "object" ? item.productId?.name : undefined) || "Product"
+                        return (
+                          <p key={i} className="text-xs text-gray-500 truncate">
+                            {name} <span className="text-gray-400">× {item.quantity ?? 1}</span>
+                          </p>
+                        )
+                      })}
+                      {extraCount > 0 && (
+                        <p className="text-xs text-gray-400">+{extraCount} more item{extraCount > 1 ? "s" : ""}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Col 3 — Date + Amount (stacked, fixed width) */}
@@ -342,12 +348,14 @@ export default function OrdersPage() {
                       {badge.label}
                     </span>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => status === "shipped" && setTrackOrder(order)}
-                        className={`px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors duration-150 ${action.style}`}
-                      >
-                        {action.label}
-                      </button>
+                      {TRACKABLE.has(status) && (
+                        <button
+                          onClick={() => setTrackOrder(order)}
+                          className="px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors duration-150 bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          Track Order
+                        </button>
+                      )}
                       <button className="flex items-center justify-center h-9 w-9 rounded-md text-gray-400 hover:bg-gray-200 transition-colors duration-150">
                         <MoreHorizontal className="h-4 w-4" />
                       </button>

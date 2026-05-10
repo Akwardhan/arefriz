@@ -38,7 +38,11 @@
       "Bash(Stop-Process -Force)",
       "Bash(Get-Content \"C:\\\\Users\\\\ANMOLK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--arefriz-backend\\\\6bc03dcb-9ca2-4754-bba8-fe7cf37d6b0e\\\\tasks\\\\bkr4j6iyq.output\" -Wait)",
       "Bash(Select-String -Pattern \"listening|running|started|error|Error|EADDRINUSE|Cannot|MongoDB\")",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "PowerShell(curl.exe --version 2>$null | Select-Object -First 1)",
+      "PowerShell(npx --yes autocannon --version)",
+      "Bash(pkill -f \"node server.js\")",
+      "Read(//tmp/**)"
     ]
   }
 }

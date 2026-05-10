@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Plus, Trash2, Package, CheckCircle2, AlertCircle, Upload, X, Sparkles } from "lucide-react"
+import { useEffect, useRef, useState, useCallback } from "react"
+import { Plus, Trash2, Package, CheckCircle2, AlertCircle, Upload, X, Sparkles, ChevronDown, Pencil, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { BASE_URL } from "@/lib/config"
 
@@ -9,7 +9,29 @@ import { BASE_URL } from "@/lib/config"
 
 interface Spec { label: string; value: string }
 
+interface DealerProduct {
+  _id: string
+  name: string
+  brand: string
+  category: string
+  type?: string
+  price: number
+  image?: string | null
+  status: string
+  stock?: number
+  shortDescription?: string
+  description?: string
+  createdAt?: string
+}
+
 const CATEGORIES = ["valves", "compressors", "controls", "piping", "electrical"] as const
+
+const SORT_OPTIONS = [
+  { value: "latest",     label: "Latest"           },
+  { value: "oldest",     label: "Oldest"           },
+  { value: "price_high", label: "Price: High → Low" },
+  { value: "price_low",  label: "Price: Low → High" },
+]
 
 const SECTIONS = [
   { id: "basic",       label: "Basic Information"   },
@@ -30,9 +52,460 @@ const EMPTY_FORM = {
   description:      "",
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── My Products Section ───────────────────────────────────────────────────────
+
+function sortProducts(products: DealerProduct[], sort: string): DealerProduct[] {
+  return [...products].sort((a, b) => {
+    if (sort === "oldest")     return new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()
+    if (sort === "price_high") return b.price - a.price
+    if (sort === "price_low")  return a.price - b.price
+    return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+  })
+}
+
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+
+interface EditForm {
+  name: string; brand: string; category: string; type: string
+  price: string; stock: boolean; shortDescription: string; description: string
+}
+
+function EditModal({
+  product,
+  onClose,
+  onSaved,
+}: {
+  product: DealerProduct
+  onClose: () => void
+  onSaved: (updated: DealerProduct) => void
+}) {
+  const [form, setForm] = useState<EditForm>({
+    name:             product.name,
+    brand:            product.brand,
+    category:         product.category,
+    type:             product.type ?? "",
+    price:            String(product.price),
+    stock:            (product.stock ?? 1) > 0,
+    shortDescription: product.shortDescription ?? "",
+    description:      product.description ?? "",
+  })
+  const [saving,  setSaving]  = useState(false)
+  const [errMsg,  setErrMsg]  = useState("")
+
+  function set(field: keyof EditForm, value: string | boolean) {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setErrMsg("")
+    const token = sessionStorage.getItem("dealerToken")
+    if (!token) { setErrMsg("Not authenticated."); setSaving(false); return }
+
+    const fd = new FormData()
+    fd.append("name",             form.name)
+    fd.append("brand",            form.brand)
+    fd.append("category",         form.category)
+    fd.append("type",             form.type)
+    fd.append("price",            form.price)
+    fd.append("stock",            form.stock ? "1" : "0")
+    fd.append("shortDescription", form.shortDescription)
+    fd.append("description",      form.description)
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/dealer/products/${product._id}`, {
+        method:  "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body:    fd,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { message?: string }).message ?? `Error ${res.status}`)
+      }
+      const updated = await res.json()
+      onSaved(updated)
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : "Save failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.4)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-[3px] w-full rounded-t-2xl" style={{ background: "linear-gradient(90deg,#10b981,#059669)" }} />
+
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[1rem] font-bold text-gray-900">Edit Product</h2>
+            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className={labelCls}>Product Name <span className="text-red-400">*</span></label>
+                <input required value={form.name} onChange={e => set("name", e.target.value)} className={inputCls} placeholder="Product name" />
+              </div>
+              <div>
+                <label className={labelCls}>Brand <span className="text-red-400">*</span></label>
+                <input required value={form.brand} onChange={e => set("brand", e.target.value)} className={inputCls} placeholder="Brand" />
+              </div>
+              <div>
+                <label className={labelCls}>Category <span className="text-red-400">*</span></label>
+                <select required value={form.category} onChange={e => set("category", e.target.value)} className={inputCls}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Type</label>
+                <input value={form.type} onChange={e => set("type", e.target.value)} className={inputCls} placeholder="e.g. Solenoid" />
+              </div>
+              <div>
+                <label className={labelCls}>Price (₹) <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[0.82rem] font-semibold text-gray-400">₹</span>
+                  <input required type="number" min={0} value={form.price} onChange={e => set("price", e.target.value)} className={cn(inputCls, "pl-7")} placeholder="0" />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Stock</label>
+                <div className="flex h-10 overflow-hidden rounded-xl border border-gray-200 text-[0.82rem]">
+                  <button type="button" onClick={() => set("stock", true)}
+                    className={cn("flex-1 font-semibold transition-all", form.stock ? "text-white" : "bg-white text-gray-400 hover:bg-emerald-50")}
+                    style={form.stock ? { background: "linear-gradient(135deg,#10b981,#059669)" } : {}}>
+                    In Stock
+                  </button>
+                  <div className="w-px shrink-0 bg-gray-200" />
+                  <button type="button" onClick={() => set("stock", false)}
+                    className={cn("flex-1 font-semibold transition-all", !form.stock ? "text-white" : "bg-white text-gray-400 hover:bg-emerald-50")}
+                    style={!form.stock ? { background: "linear-gradient(135deg,#10b981,#059669)" } : {}}>
+                    Out of Stock
+                  </button>
+                </div>
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Short Description</label>
+                <input value={form.shortDescription} onChange={e => set("shortDescription", e.target.value)} className={inputCls} placeholder="One-line summary" />
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Description</label>
+                <textarea rows={3} value={form.description} onChange={e => set("description", e.target.value)}
+                  className={cn(inputCls, "h-auto resize-none py-2.5")} placeholder="Full description…" />
+              </div>
+            </div>
+
+            {errMsg && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                <p className="text-[0.82rem] text-red-600">{errMsg}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose}
+                className="h-9 rounded-xl border border-gray-200 px-4 text-[0.82rem] font-semibold text-gray-500 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving}
+                className="flex h-9 items-center gap-2 rounded-xl px-4 text-[0.82rem] font-bold text-white transition-all hover:opacity-90 disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                {saving ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── My Products Section ───────────────────────────────────────────────────────
+
+const PRODUCTS_PAGE_SIZE = 10
+
+function MyProductsSection() {
+  const [products,    setProducts]    = useState<DealerProduct[]>([])
+  const [sort,        setSort]        = useState("latest")
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState("")
+  const [editProduct, setEditProduct] = useState<DealerProduct | null>(null)
+  const [deleting,    setDeleting]    = useState<string | null>(null)
+  const [page,        setPage]        = useState(1)
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const token = sessionStorage.getItem("dealerToken")
+      const res = await fetch(`${BASE_URL}/api/dealer/products?limit=200`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      const data = await res.json()
+      setProducts(Array.isArray(data) ? data : (data?.products ?? []))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load products")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchProducts() }, [fetchProducts])
+  useEffect(() => { setPage(1) }, [sort])
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this product? This cannot be undone.")) return
+    setDeleting(id)
+    try {
+      const token = sessionStorage.getItem("dealerToken")
+      const res = await fetch(`${BASE_URL}/api/dealer/products/${id}`, {
+        method:  "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      setProducts(prev => prev.filter(p => p._id !== id))
+    } catch {
+      alert("Failed to delete product. Please try again.")
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const sorted     = sortProducts(products, sort)
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PRODUCTS_PAGE_SIZE))
+  const paginated  = sorted.slice((page - 1) * PRODUCTS_PAGE_SIZE, page * PRODUCTS_PAGE_SIZE)
+
+  return (
+    <section className="mb-12">
+      {/* Section header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <p className="mb-1 text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-500">
+            Dealer · Products
+          </p>
+          <h1 className="text-[1.75rem] font-extrabold tracking-[-0.025em] text-gray-900">
+            My Listed Products
+          </h1>
+          {!loading && sorted.length > 0 && (
+            <p className="mt-1 text-[0.78rem] text-gray-400">
+              {sorted.length} product{sorted.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value)}
+              className="appearance-none h-9 rounded-lg border border-gray-200 bg-white pl-3 pr-8 text-[0.82rem] text-gray-700 outline-none cursor-pointer hover:border-gray-300 transition-colors"
+            >
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          </div>
+          <button
+            onClick={fetchProducts}
+            className="flex items-center gap-1.5 h-9 rounded-lg border border-gray-200 px-3 text-[0.82rem] text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-4 border-b border-gray-50 px-5 py-3.5 last:border-0">
+              <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-gray-100" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-48 animate-pulse rounded-full bg-gray-100" />
+                <div className="h-2.5 w-24 animate-pulse rounded-full bg-gray-100" />
+              </div>
+              <div className="h-3 w-16 animate-pulse rounded-full bg-gray-100" />
+              <div className="h-3 w-12 animate-pulse rounded-full bg-gray-100" />
+              <div className="h-3 w-20 animate-pulse rounded-full bg-gray-100" />
+              <div className="h-3 w-16 animate-pulse rounded-full bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {!loading && error && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <p className="text-sm text-red-600">{error}</p>
+          <button onClick={fetchProducts} className="ml-auto text-[0.78rem] font-semibold text-red-500 hover:underline">Retry</button>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!loading && !error && sorted.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-100 bg-gray-50 px-6 py-16 text-center">
+          <Package className="mb-3 h-10 w-10 text-gray-200" strokeWidth={1} />
+          <p className="text-sm font-semibold text-gray-500">No products yet</p>
+          <p className="mt-1 text-xs text-gray-400">Add your first product using the form below.</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {!loading && !error && sorted.length > 0 && (
+        <>
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+            {/* Header row */}
+            <div
+              className="grid items-center border-b border-gray-100 bg-gray-50/70 px-5 py-3"
+              style={{ gridTemplateColumns: "2.5fr 1fr 1fr 1fr 1fr 80px" }}
+            >
+              {["Product", "Category", "Sub-Type", "Price", "Date", ""].map(h => (
+                <span key={h} className="text-[0.63rem] font-bold uppercase tracking-[0.12em] text-gray-400">{h}</span>
+              ))}
+            </div>
+
+            {paginated.map(product => (
+              <div
+                key={product._id}
+                className="grid items-center border-b border-gray-50 px-5 py-3.5 last:border-0 hover:bg-gray-50/60 transition-colors"
+                style={{ gridTemplateColumns: "2.5fr 1fr 1fr 1fr 1fr 80px" }}
+              >
+                {/* Product */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                    {product.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`${BASE_URL}${product.image}`} alt={product.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Package className="h-4 w-4 text-gray-200" strokeWidth={1} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[0.85rem] font-semibold text-gray-900 truncate">{product.name}</p>
+                      <span
+                        className={cn(
+                          "shrink-0 inline-block h-1.5 w-1.5 rounded-full",
+                          product.status === "approved" ? "bg-emerald-400" : "bg-amber-400"
+                        )}
+                        title={product.status === "approved" ? "Live" : "Pending"}
+                      />
+                    </div>
+                    <p className="text-[0.72rem] text-gray-400 truncate">{product.brand}</p>
+                  </div>
+                </div>
+
+                {/* Category */}
+                <span className="text-[0.78rem] text-gray-600 capitalize">{product.category}</span>
+
+                {/* Sub-Type */}
+                <span className="text-[0.78rem] text-gray-500">{product.type || "—"}</span>
+
+                {/* Price */}
+                <span className="text-[0.85rem] font-bold text-gray-900">
+                  ₹{product.price.toLocaleString("en-IN")}
+                </span>
+
+                {/* Date */}
+                <span className="text-[0.75rem] text-gray-400">
+                  {product.createdAt
+                    ? new Date(product.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"}
+                </span>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    onClick={() => setEditProduct(product)}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(product._id)}
+                    disabled={deleting === product._id}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-40"
+                    aria-label="Delete"
+                  >
+                    {deleting === product._id
+                      ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      : <Trash2 className="h-3.5 w-3.5" />
+                    }
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-5 flex items-center justify-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded-md text-[0.78rem] text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default transition-colors"
+              >
+                ← Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  className={cn(
+                    "h-7 w-7 rounded-md text-[0.78rem] font-medium transition-colors",
+                    page === n ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 rounded-md text-[0.78rem] text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Edit Modal */}
+      {editProduct && (
+        <EditModal
+          product={editProduct}
+          onClose={() => setEditProduct(null)}
+          onSaved={(updated) => {
+            setProducts(prev => prev.map(p => p._id === updated._id ? { ...p, ...updated } : p))
+            setEditProduct(null)
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
+// ── Add Product Page ───────────────────────────────────────────────────────────
 
 export default function DealerProductsPage() {
+  const [tab,           setTab]           = useState<"listed" | "add">("listed")
   const [form,          setForm]          = useState(EMPTY_FORM)
   const [specs,         setSpecs]         = useState<Spec[]>([{ label: "", value: "" }])
   const [inStock,       setInStock]       = useState(true)
@@ -41,6 +514,7 @@ export default function DealerProductsPage() {
   const [primaryIndex,  setPrimaryIndex]  = useState(0)
   const [status,        setStatus]        = useState<"idle" | "loading" | "success" | "error">("idle")
   const [errMsg,        setErrMsg]        = useState("")
+  const [refreshKey,    setRefreshKey]    = useState(0)
 
   const previewUrlsRef = useRef<string[]>([])
   useEffect(() => { previewUrlsRef.current = imagePreviews }, [imagePreviews])
@@ -70,9 +544,9 @@ export default function DealerProductsPage() {
     })
   }
 
-  function addSpec()                                        { setSpecs(prev => [...prev, { label: "", value: "" }]) }
-  function removeSpec(i: number)                            { setSpecs(prev => prev.filter((_, idx) => idx !== i)) }
-  function updateSpec(i: number, key: "label" | "value", val: string) {
+  function addSpec()                                                        { setSpecs(prev => [...prev, { label: "", value: "" }]) }
+  function removeSpec(i: number)                                            { setSpecs(prev => prev.filter((_, idx) => idx !== i)) }
+  function updateSpec(i: number, key: "label" | "value", val: string)      {
     setSpecs(prev => prev.map((s, idx) => idx === i ? { ...s, [key]: val } : s))
   }
 
@@ -126,6 +600,8 @@ export default function DealerProductsPage() {
       }
       setStatus("success")
       reset()
+      setRefreshKey(k => k + 1)
+      setTab("listed")
       setTimeout(() => setStatus("idle"), 4000)
     } catch (err) {
       setStatus("error")
@@ -136,15 +612,43 @@ export default function DealerProductsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
 
-      {/* ── Page header ── */}
-      <div className="mb-10">
+      {/* ── Tab bar ── */}
+      <div className="mb-8 flex items-center border-b border-gray-100">
+        {([
+          { key: "listed", label: "Listed Products" },
+          { key: "add",    label: "Add Product"     },
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className="relative px-5 py-3 text-[0.85rem] font-semibold transition-colors duration-150"
+            style={{ color: tab === t.key ? "#111827" : "#9CA3AF" }}
+          >
+            {t.label}
+            {tab === t.key && (
+              <span
+                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                style={{ background: "linear-gradient(90deg,#10b981,#059669)" }}
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Listed Products tab ── */}
+      {tab === "listed" && <MyProductsSection key={refreshKey} />}
+
+      {/* ── Add Product tab ── */}
+      {tab === "add" && <>
+
+      <div className="mb-8">
         <p className="mb-1.5 text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-500">
-          Dealer · Products
+          Add New
         </p>
-        <h1 className="text-[1.75rem] font-extrabold tracking-[-0.025em] text-gray-900">
-          Add New Product
-        </h1>
-        <p className="mt-1.5 text-[0.83rem] text-gray-400">
+        <h2 className="text-[1.4rem] font-extrabold tracking-[-0.025em] text-gray-900">
+          List a New Product
+        </h2>
+        <p className="mt-1 text-[0.83rem] text-gray-400">
           Fill in all required fields before publishing.
         </p>
       </div>
@@ -417,6 +921,8 @@ export default function DealerProductsPage() {
 
         </form>
       </div>
+      </>}
+
     </div>
   )
 }
@@ -469,6 +975,8 @@ function Field({ label, required, children }: {
     </div>
   )
 }
+
+const labelCls = "mb-1 block text-[0.7rem] font-bold uppercase tracking-[0.12em] text-gray-400"
 
 const inputCls =
   "h-10 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 text-[0.88rem] text-gray-900 outline-none transition-all placeholder:text-gray-300 focus:border-emerald-300 focus:bg-white focus:ring-3 focus:ring-emerald-50"
