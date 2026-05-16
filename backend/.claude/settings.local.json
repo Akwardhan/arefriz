@@ -42,7 +42,9 @@
       "PowerShell(curl.exe --version 2>$null | Select-Object -First 1)",
       "PowerShell(npx --yes autocannon --version)",
       "Bash(pkill -f \"node server.js\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\arefriz\\\\backend\" -Recurse -File)",
+      "Bash(Select-Object Name, FullName)"
     ]
   }
 }

@@ -55,4 +55,14 @@ const getProductById = async (req, res) => {
   res.json(product);
 };
 
-module.exports = { addProduct, getProducts, getProductById };
+const getCategories = async (req, res) => {
+  try {
+    const categories = await Product.distinct('category', { status: 'approved' });
+    res.json(categories.filter(Boolean).sort());
+  } catch (err) {
+    console.error('getCategories error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { addProduct, getProducts, getProductById, getCategories };

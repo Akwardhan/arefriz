@@ -32,7 +32,10 @@
       "Bash(Get-Content \"C:\\\\Users\\\\ANMOLK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--arefriz-frontend\\\\c315ccd6-4199-48be-aec0-d99b871130fb\\\\tasks\\\\biszqb7do.output\" -Wait)",
       "Bash(Select-String --line-buffered \"Ready|Error|error|Failed|failed|localhost\")",
       "Bash(Get-Content *)",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\arefriz\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(grep -E \"\\\\.\\(js|ts\\)$\")"
     ]
   }
 }

@@ -80,6 +80,18 @@ Login as an admin and receive a JWT token.
 
 ## Products
 
+### GET /api/products/categories
+Get a sorted list of distinct categories from all approved products. No authentication required.
+
+**Response:**
+```json
+["compressors", "controls", "electrical", "piping", "valves"]
+```
+
+> Reflects the actual categories present in the DB. Automatically includes any new category added via a product.
+
+---
+
 ### GET /api/products
 Get all approved products. No authentication required.
 
