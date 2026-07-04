@@ -42,7 +42,18 @@
       "PowerShell(curl.exe --version 2>$null | Select-Object -First 1)",
       "PowerShell(npx --yes autocannon --version)",
       "Bash(pkill -f \"node server.js\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git -C C:/arefriz/backend log --oneline -- backend)",
+      "Bash(git -C C:/arefriz/backend log --oneline -- controllers/cartController.js)",
+      "Bash(git -C C:/arefriz/backend ls-files)",
+      "Bash(git -C C:/arefriz/backend log --oneline -- backend/controllers/cartController.js)",
+      "Bash(grep -iE \"\\\\.env$|admin password\")",
+      "Bash(grep -rn \"require\\('\\\\.\\\\./\\\\.\\\\./backend\\\\|require\\(\\\\\"\\\\.\\\\./\\\\.\\\\./backend\\\\|backend/backend\" controllers routes middleware models server.js frontend/src)",
+      "Bash(echo \"---checked, exit $?\")",
+      "Bash(grep -rn \"from \\\\\"\\\\.\\\\./\\\\.\\\\./\" src --include=*.tsx --include=*.ts)",
+      "Bash(grep -rn \"^\\\\s*//.*\\\\\\(useState\\\\|useEffect\\\\|fetch\\\\|return\\\\|<div\\\\|<Link\\\\\\)\" src --include=*.tsx)",
+      "Bash(git -C /c/arefriz/backend log --oneline -- frontend/CLAUDE.md frontend/AGENTS.md)",
+      "Bash(git -C /c/arefriz/backend log -p --follow -- frontend/AGENTS.md)"
     ]
   }
 }

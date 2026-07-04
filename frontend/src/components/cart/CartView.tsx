@@ -11,6 +11,7 @@ const fmt = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n)
 
 interface CartItem {
+  _id?:      string
   productId: string
   name:      string
   price:     number
@@ -43,8 +44,8 @@ export default function CartView() {
       const raw = data?.items || data?.products || []
       const normalized: CartItem[] = raw.map((i: CartItem & { productId: string | { _id: string; name: string; price: number; image?: string } }) =>
         typeof i.productId === "object"
-          ? { productId: i.productId._id, name: i.productId.name, price: i.productId.price, image: i.productId.image, quantity: i.quantity }
-          : i
+          ? { _id: i._id, productId: i.productId._id, name: i.productId.name, price: i.productId.price, image: i.productId.image, quantity: i.quantity }
+          : { ...i, _id: i._id }
       )
       setCart(normalized)
       setLoading(false)
@@ -132,8 +133,8 @@ export default function CartView() {
             ))}
           </div>
 
-          {cart.map((item) => (
-            <div key={item.productId} className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-[1fr_110px_130px_90px_36px] sm:items-center sm:gap-4">
+          {cart.map((item, index) => (
+            <div key={item._id ?? `${item.productId}-${index}`} className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-[1fr_110px_130px_90px_36px] sm:items-center sm:gap-4">
               <p className="text-[0.88rem] font-semibold leading-snug text-gray-900">{item.name}</p>
 
               <p className="text-[0.85rem] text-gray-500">
@@ -174,8 +175,8 @@ export default function CartView() {
           <p className="mb-4 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-gray-400">Order Summary</p>
 
           <div className="space-y-3">
-            {cart.map((item) => (
-              <div key={item.productId} className="flex items-start justify-between gap-3">
+            {cart.map((item, index) => (
+              <div key={item._id ?? `${item.productId}-${index}`} className="flex items-start justify-between gap-3">
                 <p className="text-[0.78rem] leading-snug text-gray-600">
                   {item.name}<span className="ml-1.5 text-gray-400">×{item.quantity}</span>
                 </p>

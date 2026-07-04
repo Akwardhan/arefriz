@@ -44,12 +44,15 @@ Login as a buyer/user and receive a JWT token.
 {
   "token": "<jwt_token>",
   "user": {
+    "id": "<userId>",
     "name": "John Doe",
     "email": "john@example.com",
     "role": "buyer"
   }
 }
 ```
+
+> Returns 403 if the account's `role` is `admin` — admin accounts must use `POST /api/admin/login` instead.
 
 ---
 
@@ -69,19 +72,21 @@ Login as an admin and receive a JWT token.
 {
   "token": "<jwt_token>",
   "user": {
-    "name": "Admin",
+    "id": "<userId>",
     "email": "admin@example.com",
     "role": "admin"
   }
 }
 ```
 
+> Note: the response does **not** include `name` (unlike `POST /api/auth/login`). Returns 403 if the account's `role` is not `admin`.
+
 ---
 
 ## Products
 
 ### GET /api/products
-Get all approved products. No authentication required.
+Get all approved products, paginated. No authentication required.
 
 **Query Parameters (all optional):**
 | Param | Type | Description |
@@ -91,8 +96,18 @@ Get all approved products. No authentication required.
 | `type` | string | Filter by type |
 | `minPrice` | number | Minimum price |
 | `maxPrice` | number | Maximum price |
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `100`, max `200`) |
 
-**Response:** Array of product objects.
+**Response:**
+```json
+{
+  "products": [ { "_id": "<productId>", "name": "...", "price": 4500, "...": "..." } ],
+  "total": 42,
+  "page": 1,
+  "pages": 1
+}
+```
 
 ---
 
@@ -131,18 +146,34 @@ Authorization: Bearer <token>
 ```
 
 ### POST /api/cart/add
-Add a product to the cart.
+Add a product to the cart. If the product is already in the cart, its quantity is increased instead of creating a duplicate entry.
 
 **Body:**
 ```json
 {
   "productId": "<productId>",
-  "quantity": 1,
-  "price": 120
+  "name": "Product name",
+  "price": 120,
+  "image": "<imageUrl>",
+  "quantity": 1
 }
 ```
 
-**Response:** Updated cart object with populated product details.
+**Response:**
+```json
+{
+  "items": [
+    {
+      "productId": "<productId>",
+      "name": "Product name",
+      "price": 120,
+      "image": "<imageUrl>",
+      "quantity": 1
+    }
+  ],
+  "totalAmount": 120
+}
+```
 
 ---
 
@@ -152,11 +183,13 @@ Get the current user's cart.
 **Response:**
 ```json
 {
-  "products": [
+  "items": [
     {
-      "productId": { "_id": "...", "name": "...", "price": 120, "image": "..." },
-      "quantity": 1,
-      "price": 120
+      "productId": "<productId>",
+      "name": "Product name",
+      "price": 120,
+      "image": "<imageUrl>",
+      "quantity": 1
     }
   ],
   "totalAmount": 120
@@ -166,7 +199,7 @@ Get the current user's cart.
 ---
 
 ### PATCH /api/cart/update
-Update the quantity of an item already in the cart.
+Update the quantity of an item already in the cart. Setting `quantity` to `0` removes the item.
 
 **Body:**
 ```json
@@ -176,14 +209,20 @@ Update the quantity of an item already in the cart.
 }
 ```
 
-**Response:** Updated cart object.
+**Response:**
+```json
+{ "items": [ ... ], "totalAmount": 120 }
+```
 
 ---
 
-### DELETE /api/cart/:productId
-Remove a specific product from the cart.
+### DELETE /api/cart/:id
+Remove a specific product (by product id) from the cart.
 
 **Response:** Updated cart object.
+```json
+{ "items": [ ... ], "totalAmount": 120 }
+```
 
 ---
 
@@ -236,7 +275,7 @@ Authorization: Bearer <token>
 ---
 
 ### GET /api/orders
-Get orders. Requires authentication.
+Get orders, paginated. Requires authentication.
 - **Admin** — returns all orders.
 - **Buyer** — returns only their own orders.
 
@@ -245,19 +284,47 @@ Get orders. Requires authentication.
 Authorization: Bearer <token>
 ```
 
-**Response:** Array of order objects (products populated with name, price, image).
+**Query Parameters (all optional):**
+| Param | Type | Description |
+|---|---|---|
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `50`, max `200`) |
+
+**Response:**
+```json
+{
+  "orders": [ { "orderId": "ARF12345", "products": [...], "totalAmount": 320, "...": "..." } ],
+  "total": 12,
+  "page": 1,
+  "pages": 1
+}
+```
 
 ---
 
 ### GET /api/orders/my
-Get the currently authenticated user's orders only.
+Get the currently authenticated user's orders only, paginated.
 
 **Headers:**
 ```
 Authorization: Bearer <token>
 ```
 
-**Response:** Array of order objects for the logged-in user, latest first.
+**Query Parameters (all optional):**
+| Param | Type | Description |
+|---|---|---|
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `20`, max `100`) |
+
+**Response:**
+```json
+{
+  "orders": [ { "orderId": "ARF12345", "products": [...], "totalAmount": 320, "...": "..." } ],
+  "total": 3,
+  "page": 1,
+  "pages": 1
+}
+```
 
 ---
 
@@ -306,14 +373,28 @@ Authorization: Bearer <token>
 ## Admin — Orders
 
 ### GET /api/admin/orders
-Get all orders, latest first. Admin only.
+Get all orders, latest first, paginated. Admin only. (Uses the same handler as `GET /api/orders` when called by an admin.)
 
 **Headers:**
 ```
 Authorization: Bearer <token>
 ```
 
-**Response:** Array of all order objects.
+**Query Parameters (all optional):**
+| Param | Type | Description |
+|---|---|---|
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `50`, max `200`) |
+
+**Response:**
+```json
+{
+  "orders": [ { "orderId": "ARF12345", "products": [...], "totalAmount": 320, "...": "..." } ],
+  "total": 12,
+  "page": 1,
+  "pages": 1
+}
+```
 
 ---
 
@@ -520,6 +601,10 @@ Authorization: Bearer <token>
 
 ---
 
+> ⚠ **Known gap — not yet implemented:** the admin frontend (`frontend/src/components/admin/AdminDashboard.tsx`) calls `PATCH /api/inquiries/:id` (update inquiry status) and `POST /api/inquiries/:id/reply` (send an admin reply) via its own Next.js proxy routes (`frontend/src/app/api/inquiries/[id]/route.ts`). **Neither endpoint exists in the Express backend** — `routes/inquiryRoutes.js` only defines `POST /` and `GET /`. Calling either from the admin UI currently returns a 404 from the backend. This needs a backend implementation (a `PATCH /:id` and a `POST /:id/reply` route + controller function), not a documentation fix.
+
+---
+
 ## Dealer Auth
 
 ### POST /api/dealer/register
@@ -609,9 +694,23 @@ image        (file)
 ---
 
 ### GET /api/dealer/products
-Get all products belonging to the authenticated dealer.
+Get all products belonging to the authenticated dealer, paginated.
 
-**Response:** Array of product objects.
+**Query Parameters (all optional):**
+| Param | Type | Description |
+|---|---|---|
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `100`, max `200`) |
+
+**Response:**
+```json
+{
+  "products": [ { "_id": "<productId>", "name": "...", "price": 4500, "...": "..." } ],
+  "total": 8,
+  "page": 1,
+  "pages": 1
+}
+```
 
 ---
 
@@ -648,9 +747,25 @@ Authorization: Bearer <dealer_token>
 ```
 
 ### GET /api/dealer/orders
-Get all orders assigned to the authenticated dealer.
+Get all orders assigned to the authenticated dealer, latest first, paginated.
 
-**Response:** Array of order objects where `dealerId` matches the dealer, latest first.
+**Query Parameters (all optional):**
+| Param | Type | Description |
+|---|---|---|
+| `page` | number | Page number (default `1`) |
+| `limit` | number | Results per page (default `50`, max `100`) |
+
+**Response:**
+```json
+{
+  "orders": [ { "orderId": "ARF12345", "products": [...], "totalAmount": 320, "...": "..." } ],
+  "total": 5,
+  "page": 1,
+  "pages": 1
+}
+```
+
+> Order objects here are a reduced field set (`orderId, products, shippingDetails, totalAmount, dealerAmount, commissionPercent, orderStatus, paymentStatus, dealerPaid, dealerId, dealerName, createdAt`) rather than the full document.
 
 ---
 
