@@ -1,8 +1,10 @@
+const nodemailer = require('nodemailer');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const { Resend } = require('resend');
 const { EMAIL_CONFIG } = require('../config/email');
+const { ORDER_STATUSES } = require('../constants/orderStatus');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -129,14 +131,12 @@ const getOrders = async (req, res) => {
   }
 };
 
-const VALID_STATUSES = ['processing', 'shipped', 'delivered', 'cancelled'];
-
 const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!VALID_STATUSES.includes(status)) {
-      return res.status(400).json({ message: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+    if (!ORDER_STATUSES.includes(status)) {
+      return res.status(400).json({ message: `status must be one of: ${ORDER_STATUSES.join(', ')}` });
     }
 
     const order = await Order.findById(req.params.id);
@@ -241,6 +241,103 @@ const sendToDealer = async (req, res) => {
   }
 };
 
+const payDealer = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (order.orderStatus !== 'delivered') {
+      return res.status(400).json({ message: 'Order must be delivered before paying dealer' });
+    }
+
+    order.dealerPaid = true;
+    order.paymentStatus = 'paid';
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    console.error('pay-dealer error:', err);
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+};
+
+const emailOrderToDealer = async (req, res) => {
+  try {
+    const { dealerEmail } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const itemsHtml = order.products.map(item => `
+      <tr>
+        <td style="padding: 8px 12px; border: 1px solid #e0e0e0;">${item.name}</td>
+        <td style="padding: 8px 12px; text-align: center; border: 1px solid #e0e0e0;">${item.quantity}</td>
+        <td style="padding: 8px 12px; text-align: right; border: 1px solid #e0e0e0;">₹${item.price}</td>
+      </tr>`).join('');
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background: #f9f9f9;">
+        <div style="background: #ffffff; border-radius: 8px; padding: 32px; border: 1px solid #e0e0e0;">
+
+          <h2 style="margin: 0 0 4px 0; color: #1a1a1a;">New Order Assigned - ARefriz</h2>
+          <p style="color: #888; font-size: 14px;">You have received a new order.</p>
+
+          <h3 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px;">Buyer Details</h3>
+          <p><strong>Name:</strong> ${order.shippingDetails.name}</p>
+          <p><strong>Phone:</strong> ${order.shippingDetails.phone}</p>
+          <p><strong>Address:</strong> ${order.shippingDetails.address}</p>
+
+          <h3 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px;">Order Details</h3>
+          <table border="1" cellpadding="8" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #f4f4f4;">
+              <tr>
+                <th style="padding: 10px 12px; text-align: left; border: 1px solid #e0e0e0;">Product</th>
+                <th style="padding: 10px 12px; text-align: center; border: 1px solid #e0e0e0;">Quantity</th>
+                <th style="padding: 10px 12px; text-align: right; border: 1px solid #e0e0e0;">Price</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+
+          <p style="font-size: 16px; font-weight: bold; margin-top: 16px;">Total: ₹${order.totalAmount}</p>
+          <p>Please process this order.</p>
+
+          <div style="border-top: 1px solid #eee; padding-top: 16px; color: #888; font-size: 13px; text-align: center;">
+            ARefriz Team
+          </div>
+        </div>
+      </div>
+    `;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"ARefriz" <${process.env.EMAIL_USER}>`,
+      to: dealerEmail,
+      subject: 'New Order Assigned - ARefriz',
+      html,
+    });
+
+    console.log('ORDER EMAIL SENT:', order._id, dealerEmail);
+
+    order.dealerEmail = dealerEmail;
+    order.emailSent = true;
+    order.emailSentAt = new Date();
+    await order.save();
+
+    res.json({ message: 'Order sent to dealer successfully' });
+  } catch (error) {
+    console.error('send-to-dealer error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const getMyOrders = async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page)  || 1);
@@ -260,4 +357,4 @@ const getMyOrders = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getOrders, updateOrderStatus, sendToDealer, getMyOrders };
+module.exports = { createOrder, getOrders, updateOrderStatus, sendToDealer, getMyOrders, payDealer, emailOrderToDealer };

@@ -1,6 +1,5 @@
 const Order = require('../models/Order');
-
-const DEALER_VALID_STATUSES = ['processing', 'shipped', 'delivered', 'cancelled'];
+const { ORDER_STATUSES } = require('../constants/orderStatus');
 
 const LIST_FIELDS = 'orderId products shippingDetails totalAmount dealerAmount commissionPercent orderStatus paymentStatus dealerPaid dealerId dealerName createdAt';
 
@@ -32,8 +31,8 @@ const updateDealerOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!DEALER_VALID_STATUSES.includes(status)) {
-      return res.status(400).json({ message: `status must be one of: ${DEALER_VALID_STATUSES.join(', ')}` });
+    if (!ORDER_STATUSES.includes(status)) {
+      return res.status(400).json({ message: `status must be one of: ${ORDER_STATUSES.join(', ')}` });
     }
 
     const order = await Order.findOne({ _id: req.params.id, dealerId: req.dealer.id });
