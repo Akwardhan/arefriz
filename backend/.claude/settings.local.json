@@ -53,7 +53,9 @@
       "Bash(grep -rn \"from \\\\\"\\\\.\\\\./\\\\.\\\\./\" src --include=*.tsx --include=*.ts)",
       "Bash(grep -rn \"^\\\\s*//.*\\\\\\(useState\\\\|useEffect\\\\|fetch\\\\|return\\\\|<div\\\\|<Link\\\\\\)\" src --include=*.tsx)",
       "Bash(git -C /c/arefriz/backend log --oneline -- frontend/CLAUDE.md frontend/AGENTS.md)",
-      "Bash(git -C /c/arefriz/backend log -p --follow -- frontend/AGENTS.md)"
+      "Bash(git -C /c/arefriz/backend log -p --follow -- frontend/AGENTS.md)",
+      "Bash(git rm *)",
+      "Bash(echo \"---exit code was: $?\")"
     ]
   }
 }
