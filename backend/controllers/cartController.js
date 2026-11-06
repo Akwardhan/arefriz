@@ -3,7 +3,6 @@ const Cart = require('../models/Cart');
 const getCartHandler = async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  console.log("USER FROM TOKEN:", req.user);
 
   const cart = await Cart.findOne({ userId });
   if (!cart) return res.json({ items: [] });
@@ -13,7 +12,6 @@ const getCartHandler = async (req, res) => {
 const addToCart = async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  console.log("USER FROM TOKEN:", req.user);
 
   const { productId, name, price, image, quantity } = req.body;
 
@@ -36,7 +34,6 @@ const addToCart = async (req, res) => {
 const updateCartItem = async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  console.log("USER FROM TOKEN:", req.user);
 
   const { productId, quantity } = req.body;
 
@@ -57,7 +54,6 @@ const updateCartItem = async (req, res) => {
 const removeFromCart = async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  console.log("USER FROM TOKEN:", req.user);
 
   const { productId } = req.params;
 
@@ -72,7 +68,6 @@ const removeFromCart = async (req, res) => {
 const clearCart = async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  console.log("USER FROM TOKEN:", req.user);
 
   const cart = await Cart.findOne({ userId });
   if (cart) {

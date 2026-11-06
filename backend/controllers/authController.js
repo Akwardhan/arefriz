@@ -23,12 +23,7 @@ const loginUser = async (req, res) => {
   const user = await User.findOne({ email });
   if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-  console.log("INPUT PASSWORD:", password);
-  console.log("HASH IN DB:", user.password);
-
   const isMatch = await bcrypt.compare(password, user.password);
-
-  console.log("MATCH RESULT:", isMatch);
   if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
   if (user.role === 'admin') return res.status(403).json({ message: 'Invalid credentials' });
