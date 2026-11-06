@@ -1,0 +1,45 @@
+# ============================================================================
+# GitHub Copilot Code Review Configuration
+# ============================================================================
+# This configures Copilot's automated PR review behavior.
+# Docs: https://docs.github.com/en/copilot/using-github-copilot/code-review
+# ============================================================================
+
+review:
+  # Enable automatic review on PRs to these branches
+  auto_review:
+    enabled: true
+    # Copilot reviews PRs targeting staging and main
+    target_branches:
+      - staging
+      - main
+
+  # Focus areas for review
+  instructions:
+    - path: "backend/**"
+      instructions: |
+        Focus on:
+        - SQL injection via raw queries (prefer Prisma parameterized queries)
+        - Missing Zod input validation on request handlers
+        - Hardcoded secrets, API keys, or database credentials
+        - Missing error handling (uncaught promise rejections)
+        - Rate limiting on auth and checkout endpoints
+        - Server-side price recalculation (never trust client prices)
+        - Proper JWT token validation and middleware usage
+
+    - path: "frontend/**"
+      instructions: |
+        Focus on:
+        - Hardcoded API URLs (should use environment variables)
+        - XSS vulnerabilities in rendered user content
+        - Missing TypeScript types (no `any` types)
+        - Client-side secrets or API keys exposure
+        - Proper error boundaries and loading states
+        - Image optimization (use next/image)
+
+    - path: ".github/**"
+      instructions: |
+        Focus on:
+        - Workflow security (pinned action versions, minimal permissions)
+        - Secret exposure in logs
+        - Proper conditional job execution

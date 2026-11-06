@@ -1,0 +1,195 @@
+# ============================================================================
+# ARefriz CI Pipeline
+# ============================================================================
+# Runs on every PR to staging/main and every push to staging/main.
+# Jobs:
+#   1. validate    – install, lint, typecheck, test (with Postgres + Redis)
+#   2. deploy-staging    – auto-deploy when staging branch is pushed
+#   3. deploy-production – auto-deploy when main branch is pushed (batched)
+# ============================================================================
+
+name: ARefriz CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging, main]
+
+# Cancel in-flight runs for the same branch/PR to save minutes
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Job 1: Validate ──────────────────────────────────────────────────────
+  validate:
+    name: Lint, Typecheck & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arefriz_test
+          POSTGRES_USER: arefriz_test
+          POSTGRES_PASSWORD: testpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://arefriz_test:testpassword@localhost:5432/arefriz_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-jwt-secret-not-for-production
+      CORS_ORIGIN: http://localhost:3000
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      # ── Backend ────────────────────────────────────────────────────────
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+        # Will be enabled once Prisma is set up in Stage 3
+        if: hashFiles('backend/prisma/schema.prisma') != ''
+
+      - name: Run Prisma migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+        if: hashFiles('backend/prisma/schema.prisma') != ''
+
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint --if-present
+
+      - name: Typecheck backend
+        working-directory: backend
+        run: npx tsc --noEmit --pretty
+        # Will be enabled once backend is migrated to TypeScript
+        if: hashFiles('backend/tsconfig.json') != ''
+
+      - name: Test backend
+        working-directory: backend
+        run: npm test --if-present
+
+      # ── Frontend ───────────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint --if-present
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npx tsc --noEmit --pretty
+        if: hashFiles('frontend/tsconfig.json') != ''
+
+      - name: Build frontend (Next.js production build)
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5001
+
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test --if-present
+
+  # ── Job 2: Deploy to Staging ─────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: validate
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging environment
+        run: |
+          echo "──────────────────────────────────────────────"
+          echo "🚀 Deploying to Staging Environment"
+          echo "   Branch:  staging"
+          echo "   Commit:  ${{ github.sha }}"
+          echo "   Trigger: ${{ github.event_name }}"
+          echo "──────────────────────────────────────────────"
+          # TODO: Replace with actual deployment command
+          # Examples:
+          #   - docker compose -f docker-compose.staging.yml up -d --build
+          #   - ssh deploy@staging.arefriz.com "cd /app && git pull && docker compose up -d --build"
+          #   - aws ecs update-service ...
+          echo "✅ Staging deployment placeholder complete"
+
+  # ── Job 3: Deploy to Production ──────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production (Batched Releases)
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "══════════════════════════════════════════════"
+          echo "🏭 PRODUCTION DEPLOYMENT"
+          echo "   Branch:  main"
+          echo "   Commit:  ${{ github.sha }}"
+          echo "   Trigger: Batch release from staging"
+          echo "══════════════════════════════════════════════"
+          # TODO: Replace with actual production deployment
+          # Examples:
+          #   - docker compose -f docker-compose.prod.yml up -d --build
+          #   - kubectl apply -f k8s/production/
+          #   - aws ecs update-service --cluster arefriz-prod ...
+          echo "✅ Production deployment placeholder complete"
+
+      - name: Create release tag
+        if: success()
+        run: |
+          echo "📦 Would tag release: v$(date +%Y.%m.%d)-${{ github.run_number }}"
+          # TODO: Uncomment when ready for auto-tagging
+          # git tag "v$(date +%Y.%m.%d)-${{ github.run_number }}"
+          # git push origin --tags
